@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Anchorium Omni-Engine — Design System
+   ==========================================================================
+   Brand: Deep navy/indigo primary, cyan/teal accents, dark-first design.
+   Philosophy: "Trust through transparency" — premium, secure, institutional feel.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   CSS Custom Properties — Design Tokens
+   --------------------------------------------------------------------------- */
+:root {
+  /* Brand Colors */
+  --anchorium-navy: #0a1628;
+  --anchorium-indigo: #1e3a5f;
+  --anchorium-cyan: #00d4ff;
+  --anchorium-teal: #0ea5e9;
+  --anchorium-emerald: #10b981;
+  --anchorium-violet: #8b5cf6;
+
+  /* Surfaces */
+  --surface-base: #050d1a;
+  --surface-raised: #0c1a2e;
+  --surface-overlay: #122240;
+  --surface-highlight: rgba(0, 212, 255, 0.06);
+
+  /* Text */
+  --text-primary: #f0f6ff;
+  --text-secondary: #8899b4;
+  --text-muted: #4a5c75;
+  --text-accent: #00d4ff;
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-accent: rgba(0, 212, 255, 0.3);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+  --gradient-surface: linear-gradient(180deg, #0c1a2e 0%, #050d1a 100%);
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.15);
+  --shadow-glow-strong: 0 0 40px rgba(0, 212, 255, 0.25);
+
+  /* Spacing & Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Layout */
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ---------------------------------------------------------------------------
+   Global Resets & Base Styles
+   --------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--anchorium-indigo) transparent;
+}
+
+body {
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------------------------------------------------------------------------
+   Utility Animations
+   --------------------------------------------------------------------------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(0, 212, 255, 0.1); }
+  50% { box-shadow: 0 0 32px rgba(0, 212, 255, 0.25); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) ease-out both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(0, 212, 255, 0.08) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Glass / Surface Utilities
+   --------------------------------------------------------------------------- */
+.glass-panel {
+  background: rgba(12, 26, 46, 0.7);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--border-subtle);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(18, 34, 64, 0.8);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ---------------------------------------------------------------------------
+   Gradient Text
+   --------------------------------------------------------------------------- */
+.text-gradient {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
