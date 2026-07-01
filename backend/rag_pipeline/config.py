@@ -1,0 +1,247 @@
+"""Configuration management for the Anchorium RAG Pipeline.
+
+Uses Pydantic Settings V2 for type-safe, environment-variable-driven
+configuration with nested models for each subsystem.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class APIKeysConfig(BaseSettings):
+    """API key configuration for all external services.
+
+    All keys are stored as SecretStr to prevent accidental logging.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_")
+
+    openai_api_key: SecretStr = Field(
+        ...,
+        description="OpenAI API key for embeddings and LLM generation.",
+    )
+    pinecone_api_key: SecretStr = Field(
+        ...,
+        description="Pinecone API key for vector database operations.",
+    )
+    cohere_api_key: SecretStr = Field(
+        ...,
+        description="Cohere API key for reranking search results.",
+    )
+    langsmith_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="LangSmith API key for observability tracing (optional).",
+    )
+
+
+class PineconeConfig(BaseSettings):
+    """Pinecone vector database configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_PINECONE_")
+
+    index_name: str = Field(
+        default="anchorium-legal-rag",
+        description="Name of the Pinecone index.",
+    )
+    cloud: str = Field(
+        default="aws",
+        description="Cloud provider for the Pinecone serverless index.",
+    )
+    region: str = Field(
+        default="us-east-1",
+        description="Region for the Pinecone serverless index.",
+    )
+    dimension: int = Field(
+        default=1536,
+        description="Embedding vector dimension. 1536 for text-embedding-3-small, 1024 for voyage-law-2.",
+    )
+    metric: Literal["cosine", "euclidean", "dotproduct"] = Field(
+        default="cosine",
+        description="Distance metric for vector similarity.",
+    )
+    batch_size: int = Field(
+        default=100,
+        description="Number of vectors to upsert in a single batch.",
+    )
+
+
+class ChunkingConfig(BaseSettings):
+    """Configuration for legal-structural document chunking."""
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_CHUNKING_")
+
+    max_chunk_tokens: int = Field(
+        default=512,
+        description="Maximum number of tokens per chunk.",
+    )
+    overlap_tokens: int = Field(
+        default=64,
+        description="Number of overlapping tokens between adjacent chunks.",
+    )
+    min_chunk_tokens: int = Field(
+        default=50,
+        description="Minimum token count — smaller chunks are merged with neighbors.",
+    )
+    tokenizer_model: str = Field(
+        default="cl100k_base",
+        description="Tiktoken encoding model for token counting.",
+    )
+
+
+class RetrievalConfig(BaseSettings):
+    """Configuration for hybrid search and reranking."""
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_RETRIEVAL_")
+
+    alpha: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Alpha blend weight: Score = α·Sparse + (1-α)·Dense. "
+            "Higher alpha emphasizes keyword (BM25) matching."
+        ),
+    )
+    top_k_raw: int = Field(
+        default=20,
+        description="Number of raw results from each search modality before blending.",
+    )
+    top_k_reranked: int = Field(
+        default=5,
+        description="Number of results returned after Cohere reranking.",
+    )
+    temporal_boost_factor: float = Field(
+        default=0.1,
+        description=(
+            "Recency boost multiplier per year. "
+            "Score *= (1 + factor * years_newer_than_oldest)."
+        ),
+    )
+    cohere_rerank_model: str = Field(
+        default="rerank-v3.5",
+        description="Cohere reranking model identifier.",
+    )
+
+
+class EmbeddingConfig(BaseSettings):
+    """Configuration for the embedding model."""
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_EMBEDDING_")
+
+    provider: Literal["openai", "voyage"] = Field(
+        default="openai",
+        description="Embedding provider: 'openai' for text-embedding-3-small, 'voyage' for voyage-law-2.",
+    )
+    openai_model: str = Field(
+        default="text-embedding-3-small",
+        description="OpenAI embedding model name.",
+    )
+    voyage_model: str = Field(
+        default="voyage-law-2",
+        description="VoyageAI embedding model name.",
+    )
+    batch_size: int = Field(
+        default=64,
+        description="Number of texts to embed in a single API call.",
+    )
+    max_retries: int = Field(
+        default=3,
+        description="Maximum retries for embedding API calls.",
+    )
+
+
+class GenerationConfig(BaseSettings):
+    """Configuration for LLM generation and hallucination validation."""
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_GENERATION_")
+
+    model_name: str = Field(
+        default="gpt-4o",
+        description="OpenAI model for compliance answer generation.",
+    )
+    temperature: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature. 0.0 for deterministic compliance outputs.",
+    )
+    max_tokens: int = Field(
+        default=2048,
+        description="Maximum tokens in the generated response.",
+    )
+    validation_max_retries: int = Field(
+        default=2,
+        description="Maximum regeneration attempts if hallucination is detected.",
+    )
+    validation_model: str = Field(
+        default="gpt-4o",
+        description="Model used for the self-reflection hallucination check.",
+    )
+    context_window_limit: int = Field(
+        default=120000,
+        description="Maximum context window tokens for the generation model.",
+    )
+
+
+class AppSettings(BaseSettings):
+    """Root application settings composing all subsystem configurations.
+
+    Loads from a `.env` file in the project root. All nested configs
+    are initialized from their respective environment variable prefixes.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Sub-configurations
+    api_keys: APIKeysConfig = Field(default_factory=APIKeysConfig)
+    pinecone: PineconeConfig = Field(default_factory=PineconeConfig)
+    chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
+    retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
+
+    # Filesystem paths
+    data_dir: Path = Field(
+        default=Path("data"),
+        description="Root directory for ingested documents and indices.",
+    )
+    bm25_index_path: Path = Field(
+        default=Path("data/bm25_index.pkl"),
+        description="File path for the serialized BM25 index.",
+    )
+    bm25_chunks_path: Path = Field(
+        default=Path("data/bm25_chunks.pkl"),
+        description="File path for the serialized BM25 chunk metadata.",
+    )
+
+    # Observability
+    langsmith_project: str = Field(
+        default="anchorium-rag-pipeline",
+        description="LangSmith project name for tracing.",
+    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO",
+        description="Structured logging level.",
+    )
+
+
+def load_settings() -> AppSettings:
+    """Load and validate application settings from environment variables.
+
+    Returns:
+        Fully validated AppSettings instance.
+
+    Raises:
+        pydantic.ValidationError: If required environment variables are missing
+            or values fail validation constraints.
+    """
+    return AppSettings()

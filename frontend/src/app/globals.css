@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Anchorium Omni-Engine — Design System
+   Anchorium Omni-Engine — Design System (Gold & Black Theme)
    ==========================================================================
-   Brand: Deep navy/indigo primary, cyan/teal accents, dark-first design.
-   Philosophy: "Trust through transparency" — premium, secure, institutional feel.
+   Brand: Deep black background, premium gold accents, finance-focused design.
+   Philosophy: "Trust through excellence" — luxurious, secure, institutional feel.
    ========================================================================== */
 
 /* ---------------------------------------------------------------------------
@@ -12,47 +12,48 @@
    --------------------------------------------------------------------------- */
 :root {
   /* Brand Colors */
-  --anchorium-navy: #0a1628;
-  --anchorium-indigo: #1e3a5f;
-  --anchorium-cyan: #00d4ff;
-  --anchorium-teal: #0ea5e9;
-  --anchorium-emerald: #10b981;
-  --anchorium-violet: #8b5cf6;
+  --anchorium-black: #000000;
+  --anchorium-dark-gray: #0a0a0a;
+  --anchorium-medium-gray: #1a1a1a;
+  --anchorium-light-gray: #2a2a2a;
+  --anchorium-gold: #d4af37;
+  --anchorium-gold-light: #f4d03f;
+  --anchorium-gold-dark: #b8941f;
 
   /* Surfaces */
-  --surface-base: #050d1a;
-  --surface-raised: #0c1a2e;
-  --surface-overlay: #122240;
-  --surface-highlight: rgba(0, 212, 255, 0.06);
+  --surface-base: #000000;
+  --surface-raised: #0a0a0a;
+  --surface-overlay: #1a1a1a;
+  --surface-highlight: rgba(212, 175, 55, 0.08);
 
   /* Text */
-  --text-primary: #f0f6ff;
-  --text-secondary: #8899b4;
-  --text-muted: #4a5c75;
-  --text-accent: #00d4ff;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
+  --text-accent: var(--anchorium-gold);
 
   /* Borders */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-accent: rgba(0, 212, 255, 0.3);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(212, 175, 55, 0.2);
+  --border-accent: rgba(212, 175, 55, 0.5);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
-  --gradient-surface: linear-gradient(180deg, #0c1a2e 0%, #050d1a 100%);
-  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+  --gradient-primary: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+  --gradient-surface: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(212, 175, 55, 0.12) 0%, transparent 70%);
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.15);
-  --shadow-glow-strong: 0 0 40px rgba(0, 212, 255, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.2);
+  --shadow-glow-strong: 0 0 40px rgba(212, 175, 55, 0.35);
 
   /* Spacing & Radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -76,7 +77,7 @@
    --------------------------------------------------------------------------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--anchorium-indigo) transparent;
+  scrollbar-color: var(--anchorium-gold-dark) transparent;
 }
 
 body {
@@ -91,13 +92,13 @@ body {
    Utility Animations
    --------------------------------------------------------------------------- */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 16px rgba(0, 212, 255, 0.1); }
-  50% { box-shadow: 0 0 32px rgba(0, 212, 255, 0.25); }
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 16px rgba(212, 175, 55, 0.15); }
+  50% { box-shadow: 0 0 32px rgba(212, 175, 55, 0.3); }
 }
 
 @keyframes shimmer {
@@ -110,41 +111,45 @@ body {
   to { transform: rotate(360deg); }
 }
 
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 .animate-fade-in {
   animation: fadeIn var(--transition-normal) ease-out both;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+.animate-pulse-gold {
+  animation: pulse-gold 2.5s ease-in-out infinite;
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(0, 212, 255, 0.08) 50%, transparent 75%);
+  background: linear-gradient(90deg, transparent 25%, rgba(212, 175, 55, 0.1) 50%, transparent 75%);
   background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+  animation: shimmer 2.5s infinite;
 }
 
 .animate-spin-slow {
   animation: spin-slow 3s linear infinite;
 }
 
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* ---------------------------------------------------------------------------
    Glass / Surface Utilities
    --------------------------------------------------------------------------- */
 .glass-panel {
-  background: rgba(12, 26, 46, 0.7);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid var(--border-subtle);
+  background: rgba(26, 26, 26, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--border-default);
 }
 
 .glass-panel-hover:hover {
-  background: rgba(18, 34, 64, 0.8);
+  background: rgba(42, 42, 42, 0.9);
   border-color: var(--border-accent);
   box-shadow: var(--shadow-glow);
 }

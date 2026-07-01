@@ -4,12 +4,9 @@ Anchorium Omni-Engine — FastAPI Backend
 
 This is the main entry point for the Anchorium multi-agent backend.
 It provides:
-  - A health check endpoint for infrastructure monitoring
-  - CORS configuration for the Next.js frontend
-  - (Future) Ephemeral compute endpoints for the 3 AI agents:
-      1. Compliance Copilot  — RBI/FEMA regulation checks
-      2. Underwriter          — US GAAP → Indian IndAS translation
-      3. Arbitrage Calculator — USD/INR loan pathway optimization
+- A health check endpoint for infrastructure monitoring
+- CORS configuration for the Next.js frontend
+- Ephemeral compute endpoints for the RAG pipeline and AI agents
 
 SECURITY NOTE:
   This backend follows a strict zero-retention policy. Any financial
@@ -18,9 +15,12 @@ SECURITY NOTE:
 """
 
 from contextlib import asynccontextmanager
+from typing import List, Optional
+from pydantic import BaseModel, Field
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +75,22 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
+# Pydantic Models for API
+# ---------------------------------------------------------------------------
+class EmbeddedChunk(BaseModel):
+    """A chunk of text with its embedding vector and metadata"""
+    text: str
+    vector: List[float]
+
+
+class QueryRequest(BaseModel):
+    """Request model for querying the RAG pipeline"""
+    query: str
+    context_chunks: List[EmbeddedChunk] = Field(default_factory=list)
+    system_prompt: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
 # Health Check Endpoint
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["Infrastructure"])
@@ -95,16 +111,82 @@ async def health_check():
 
 
 # ---------------------------------------------------------------------------
-# Placeholder: Agent Endpoints (Phase 2+)
+# RAG & Agent Endpoints
 # ---------------------------------------------------------------------------
-# These will be implemented in future phases:
-#
-# POST /api/v1/compliance   → Compliance Copilot agent
-# POST /api/v1/underwrite   → Underwriter agent
-# POST /api/v1/arbitrage    → Arbitrage Calculator agent
-#
-# Each endpoint will:
-#   1. Receive ONLY the relevant text chunks + prompt (no raw docs)
-#   2. Route to the appropriate CrewAI/LangGraph agent
-#   3. Return the structured result
-#   4. Immediately purge all input data from memory
+@app.post("/api/v1/query", tags=["RAG"])
+async def query_rag(request: QueryRequest):
+    """
+    Query the RAG pipeline with a user query and context chunks.
+    Uses strict zero-retention policy — all data processed ephemerally.
+    """
+    try:
+        # For now, we'll implement a simplified response.
+        # In production, this would integrate with the full rag_pipeline.
+        
+        async def generate_response():
+            yield "data: {\"type\": \"thinking\"}\n\n"
+            yield "data: {\"type\": \"content\", \"content\": \"This is a sample response from the Anchorium Omni-Engine. In production, this would integrate with our full RAG pipeline for accurate responses.\\n\\nHere's what the system would do:\\n1. Use the provided context chunks\\n2. Apply strict hallucination prevention\\n3. Generate an accurate response based solely on the context\"}\n\n"
+            yield "data: {\"type\": \"done\"}\n\n"
+        
+        return StreamingResponse(
+            generate_response(),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/compliance", tags=["Agents"])
+async def compliance_agent(request: QueryRequest):
+    """
+    Compliance Copilot agent for RBI/FEMA regulation checks.
+    """
+    try:
+        async def generate_response():
+            yield "data: {\"type\": \"thinking\"}\n\n"
+            yield "data: {\"type\": \"content\", \"content\": \"Compliance Copilot Agent activated. This would check RBI/FEMA regulations based on the provided context.\"}\n\n"
+            yield "data: {\"type\": \"done\"}\n\n"
+        
+        return StreamingResponse(
+            generate_response(),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/underwrite", tags=["Agents"])
+async def underwrite_agent(request: QueryRequest):
+    """
+    Underwriter agent for US GAAP → Indian IndAS translation.
+    """
+    try:
+        async def generate_response():
+            yield "data: {\"type\": \"thinking\"}\n\n"
+            yield "data: {\"type\": \"content\", \"content\": \"Underwriter Agent activated. This would convert US GAAP financials to Indian IndAS format based on the provided context.\"}\n\n"
+            yield "data: {\"type\": \"done\"}\n\n"
+        
+        return StreamingResponse(
+            generate_response(),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/arbitrage", tags=["Agents"])
+async def arbitrage_agent(request: QueryRequest):
+    """
+    Arbitrage Calculator agent for USD/INR loan pathway optimization.
+    """
+    try:
+        async def generate_response():
+            yield "data: {\"type\": \"content\", \"content\": \"Arbitrage Calculator Agent activated. This would simulate USD-INR debt arbitrage opportunities based on the provided context.\"}\n\n"
+            yield "data: {\"type\": \"done\"}\n\n"
+        
+        return StreamingResponse(
+            generate_response(),
+            media_type="text/event-stream"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
