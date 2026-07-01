@@ -16,6 +16,7 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 interface EmbeddingResult {
   text: string;
   vector: number[];
+  documentName?: string;
 }
 
 /** Status of the embedding pipeline */
@@ -96,8 +97,10 @@ async function extractPdfText(file: File): Promise<string> {
 
 export default function LocalEmbedder({
   onEmbeddingsComplete,
+  multiple = true,
 }: {
-  onEmbeddingsComplete?: (embeddings: EmbeddingResult[], fileName: string) => void;
+  onEmbeddingsComplete?: (embeddings: EmbeddingResult[], fileName: string, isLast: boolean) => void;
+  multiple?: boolean;
 }) {
   const [status, setStatus] = useState<PipelineStatus>("idle");
   const [statusMessage, setStatusMessage] = useState<string>("");
@@ -119,129 +122,138 @@ export default function LocalEmbedder({
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Worker Communication
+  // Worker Communication & Individual File Embedding
   // ---------------------------------------------------------------------------
 
-  const embedChunks = useCallback((textChunks: string[]) => {
-    workerRef.current?.terminate();
+  const embedSingleFile = useCallback(
+    (file: File, fileIndex: number, totalFiles: number): Promise<EmbeddingResult[]> => {
+      return new Promise(async (resolve, reject) => {
+        const isText = file.name.endsWith(".txt");
+        const isPdf = file.name.endsWith(".pdf");
 
-    const worker = new Worker(
-      new URL("../workers/embedding.worker.ts", import.meta.url),
-      { type: "module" }
-    );
-
-    workerRef.current = worker;
-
-    worker.onmessage = (event: MessageEvent) => {
-      const data = event.data;
-
-      switch (data.type) {
-        case "status":
-          setStatusMessage(data.message);
-          if (data.message.includes("Loading embedding model")) {
-            setStatus("loading-model");
-          }
-          break;
-
-        case "progress":
-          setDownloadProgress({
-            loaded: data.loaded,
-            total: data.total,
-            file: data.file,
-          });
-          break;
-
-        case "result":
-          setEmbeddings(data.embeddings);
-          setStatus("complete");
-          setStatusMessage(
-            `✓ Generated ${data.embeddings.length} embeddings (384 dimensions each)`
-          );
-          setDownloadProgress(null);
-          if (onEmbeddingsComplete && fileName) {
-            onEmbeddingsComplete(data.embeddings, fileName);
-          }
-          console.group("🔒 Anchorium Local Embeddings");
-          console.log("Model: Xenova/all-MiniLM-L6-v2 (384-dim)");
-          console.log("Processing: 100% in-browser — zero data exfiltration");
-          console.table(
-            data.embeddings.map((e: EmbeddingResult, i: number) => ({
-              chunk: i + 1,
-              textPreview: e.text.slice(0, 80) + "...",
-              vectorDims: e.vector.length,
-              vectorSample: `[${e.vector.slice(0, 4).map((v: number) => v.toFixed(4)).join(", ")}, ...]`,
-            }))
-          );
-          console.groupEnd();
-          break;
-
-        case "error":
-          setStatus("error");
-          setStatusMessage(`Error: ${data.message}`);
-          break;
-      }
-    };
-
-    worker.onerror = (error) => {
-      setStatus("error");
-      setStatusMessage(`Worker error: ${error.message}`);
-    };
-
-    setStatus("embedding");
-    setStatusMessage("Preparing embedding pipeline...");
-    worker.postMessage({ type: "embed", chunks: textChunks });
-  }, [fileName, onEmbeddingsComplete]);
-
-  // ---------------------------------------------------------------------------
-  // File Processing Pipeline
-  // ---------------------------------------------------------------------------
-
-  const processFile = useCallback(
-    async (file: File) => {
-      const isText = file.name.endsWith(".txt");
-      const isPdf = file.name.endsWith(".pdf");
-
-      if (!isText && !isPdf) {
-        setStatus("error");
-        setStatusMessage("Please upload a .txt or .pdf file.");
-        return;
-      }
-
-      setFileName(file.name);
-      setEmbeddings([]);
-      setExpandedChunk(null);
-      setStatus("reading-file");
-      setStatusMessage(`Reading ${file.name}...`);
-
-      try {
-        let text: string;
-
-        if (isPdf) {
-          setStatusMessage(`Parsing PDF: ${file.name}...`);
-          text = await extractPdfText(file);
-        } else {
-          text = await file.text();
-        }
-
-        if (!text.trim()) {
-          setStatus("error");
-          setStatusMessage("The file appears to be empty or has no extractable text.");
+        if (!isText && !isPdf) {
+          reject(new Error("Please upload a .txt or .pdf file."));
           return;
         }
 
-        const textChunks = chunkText(text);
-        setChunks(textChunks);
-        setStatusMessage(`Split into ${textChunks.length} chunk(s). Starting embedding...`);
+        setFileName(file.name);
+        setStatus("reading-file");
+        setStatusMessage(`[${fileIndex}/${totalFiles}] Reading ${file.name}...`);
 
-        embedChunks(textChunks);
+        try {
+          let text: string;
+          if (isPdf) {
+            setStatusMessage(`[${fileIndex}/${totalFiles}] Parsing PDF: ${file.name}...`);
+            text = await extractPdfText(file);
+          } else {
+            text = await file.text();
+          }
+
+          if (!text.trim()) {
+            reject(new Error("The file appears to be empty or has no extractable text."));
+            return;
+          }
+
+          const textChunks = chunkText(text);
+          setChunks(textChunks);
+          setStatus("embedding");
+          setStatusMessage(`[${fileIndex}/${totalFiles}] Split into ${textChunks.length} chunks. Starting embedding...`);
+
+          workerRef.current?.terminate();
+
+          const worker = new Worker(
+            new URL("../workers/embedding.worker.ts", import.meta.url),
+            { type: "module" }
+          );
+
+          workerRef.current = worker;
+
+          worker.onmessage = (event: MessageEvent) => {
+            const data = event.data;
+
+            switch (data.type) {
+              case "status":
+                setStatusMessage(`[${fileIndex}/${totalFiles}] ${data.message}`);
+                if (data.message.includes("Loading embedding model")) {
+                  setStatus("loading-model");
+                }
+                break;
+
+              case "progress":
+                setDownloadProgress({
+                  loaded: data.loaded,
+                  total: data.total,
+                  file: data.file,
+                });
+                break;
+
+              case "result":
+                // Attach source document name to chunks
+                const resultsWithMeta = data.embeddings.map((e: EmbeddingResult) => ({
+                  ...e,
+                  documentName: file.name,
+                }));
+                setEmbeddings(resultsWithMeta);
+                setDownloadProgress(null);
+                console.group(`🔒 Anchorium Local Embeddings: ${file.name}`);
+                console.log("Model: Xenova/all-MiniLM-L6-v2 (384-dim)");
+                console.log("Processing: 100% in-browser — zero data exfiltration");
+                console.groupEnd();
+                resolve(resultsWithMeta);
+                break;
+
+              case "error":
+                reject(new Error(data.message));
+                break;
+            }
+          };
+
+          worker.onerror = (error) => {
+            reject(new Error(`Worker error: ${error.message}`));
+          };
+
+          worker.postMessage({ type: "embed", chunks: textChunks });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    },
+    []
+  );
+
+  // ---------------------------------------------------------------------------
+  // Batch File Processing Pipeline
+  // ---------------------------------------------------------------------------
+
+  const processFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      if (files.length > 6) {
+        setStatus("error");
+        setStatusMessage("Maximum 6 documents can be uploaded at once.");
+        return;
+      }
+
+      setExpandedChunk(null);
+      setEmbeddings([]);
+
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const results = await embedSingleFile(files[i], i + 1, files.length);
+          if (onEmbeddingsComplete) {
+            onEmbeddingsComplete(results, files[i].name, i === files.length - 1);
+          }
+        }
+        setStatus("complete");
+        setStatusMessage(`✓ Processed ${files.length} document(s) successfully.`);
       } catch (error) {
         setStatus("error");
         setStatusMessage(
-          `Failed to process file: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to process: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     },
-    [embedChunks]
+    [embedSingleFile, onEmbeddingsComplete]
   );
 
   // ---------------------------------------------------------------------------
@@ -266,18 +278,18 @@ export default function LocalEmbedder({
       e.stopPropagation();
       setIsDragOver(false);
 
-      const file = e.dataTransfer.files[0];
-      if (file) processFile(file);
+      const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+      if (files.length > 0) processFiles(files);
     },
-    [processFile]
+    [processFiles]
   );
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) processFile(file);
+      const files = e.target.files ? Array.from(e.target.files) : [];
+      if (files.length > 0) processFiles(files);
     },
-    [processFile]
+    [processFiles]
   );
 
   // ---------------------------------------------------------------------------
@@ -384,6 +396,7 @@ export default function LocalEmbedder({
           ref={fileInputRef}
           type="file"
           accept=".txt,.pdf"
+          multiple={multiple}
           onChange={handleFileInput}
           className="hidden"
           id="file-upload-input"
@@ -487,140 +500,7 @@ export default function LocalEmbedder({
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Embedding Results                                                  */}
-      {/* ------------------------------------------------------------------ */}
-      {embeddings.length > 0 && (
-        <div className="space-y-3 animate-fade-in" id="results-panel">
-          <div className="flex items-center justify-between">
-            <h3
-              className="text-sm font-semibold uppercase tracking-wider"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Embedding Results
-            </h3>
-            <span
-              className="text-xs px-2.5 py-1 rounded-full font-mono"
-              style={{
-                background: "rgba(212, 175, 55, 0.1)",
-                color: "var(--anchorium-gold)",
-                border: "1px solid rgba(212, 175, 55, 0.2)",
-              }}
-            >
-              384-dim vectors
-            </span>
-          </div>
 
-          {embeddings.map((embedding, index) => (
-            <div
-              key={index}
-              className="glass-panel glass-panel-hover rounded-[var(--radius-md)] overflow-hidden transition-all duration-200"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <button
-                onClick={() =>
-                  setExpandedChunk(expandedChunk === index ? null : index)
-                }
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors"
-                id={`chunk-${index}`}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
-                    style={{
-                      background: "var(--surface-overlay)",
-                      color: "var(--anchorium-gold)",
-                    }}
-                  >
-                    {index + 1}
-                  </span>
-                  <span
-                    className="text-sm truncate max-w-md"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {embedding.text.slice(0, 100)}
-                    {embedding.text.length > 100 ? "..." : ""}
-                  </span>
-                </div>
-
-                <svg
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    expandedChunk === index ? "rotate-180" : ""
-                  }`}
-                  style={{ color: "var(--text-muted)" }}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {expandedChunk === index && (
-                <div
-                  className="px-4 pb-4 space-y-3 animate-fade-in border-t"
-                  style={{ borderColor: "var(--border-subtle)" }}
-                >
-                  <div className="mt-3">
-                    <div
-                      className="text-xs font-semibold uppercase tracking-wider mb-1.5"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Source Text
-                    </div>
-                    <p
-                      className="text-sm leading-relaxed p-3 rounded-lg"
-                      style={{
-                        background: "var(--surface-overlay)",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      {embedding.text}
-                    </p>
-                  </div>
-
-                  <div>
-                    <div
-                      className="text-xs font-semibold uppercase tracking-wider mb-1.5"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Vector ({embedding.vector.length} dimensions)
-                    </div>
-                    <div
-                      className="font-mono text-xs p-3 rounded-lg overflow-x-auto"
-                      style={{
-                        background: "var(--surface-overlay)",
-                        color: "var(--anchorium-gold)",
-                      }}
-                    >
-                      [{embedding.vector.slice(0, 8).map((v) => v.toFixed(6)).join(", ")}
-                      , ... , {embedding.vector.slice(-2).map((v) => v.toFixed(6)).join(", ")}]
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span>
-                      Magnitude:{" "}
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        {Math.sqrt(
-                          embedding.vector.reduce((sum, v) => sum + v * v, 0)
-                        ).toFixed(6)}
-                      </span>
-                    </span>
-                    <span>
-                      Chars:{" "}
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        {embedding.text.length}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

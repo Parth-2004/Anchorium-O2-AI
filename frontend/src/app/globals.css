@@ -163,3 +163,45 @@ body {
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* ---------------------------------------------------------------------------
+   Additional Utilities
+   --------------------------------------------------------------------------- */
+
+/* Hide scrollbars but keep scroll functionality */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Serif headings — Anchorium Works brand */
+.font-serif-anchorium {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+/* Smooth page transition */
+.transition-page {
+  transition: opacity var(--transition-slow), transform var(--transition-slow);
+}
+
+/* Gold underline hover effect */
+.gold-underline {
+  position: relative;
+}
+.gold-underline::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--anchorium-gold);
+  transition: width var(--transition-normal);
+}
+.gold-underline:hover::after {
+  width: 100%;
+}
+
