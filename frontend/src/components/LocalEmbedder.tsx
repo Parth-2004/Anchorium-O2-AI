@@ -2,39 +2,6 @@
  * ==========================================================================
  * LocalEmbedder — In-Browser Document Embedding Component
  * ==========================================================================
- *
- * This component is the first pillar of the Anchorium Zero-Knowledge
- * architecture. It allows users to:
- *
- *   1. Upload .txt or .pdf files via drag-and-drop or file picker
- *   2. Chunk the document text locally (no server involved)
- *   3. Generate 384-dimensional embedding vectors using Transformers.js
- *      running entirely inside their browser (via a Web Worker)
- *   4. View the resulting chunks and vector previews
- *
- * PRIVACY GUARANTEE:
- *   - The uploaded file NEVER leaves the browser.
- *   - The embedding model runs locally via WebAssembly/WASM.
- *   - No network requests carry any document content.
- *   - Vectors are generated in a dedicated Web Worker (off main thread).
- *
- * ARCHITECTURE:
- *   ┌──────────────────────────────────────────────────┐
- *   │  Browser (Client)                                │
- *   │  ┌──────────┐    ┌─────────────────────────────┐ │
- *   │  │ File API │───→│ Text Chunker (main thread)  │ │
- *   │  └──────────┘    └─────────────┬───────────────┘ │
- *   │                                │ postMessage     │
- *   │                  ┌─────────────▼───────────────┐ │
- *   │                  │ Web Worker (embedding.worker)│ │
- *   │                  │ Transformers.js + MiniLM     │ │
- *   │                  └─────────────┬───────────────┘ │
- *   │                                │ postMessage     │
- *   │                  ┌─────────────▼───────────────┐ │
- *   │                  │ Results Panel (React state)  │ │
- *   │                  └─────────────────────────────┘ │
- *   └──────────────────────────────────────────────────┘
- *         ❌ No data sent to any server
  */
 
 "use client";
@@ -73,14 +40,6 @@ interface DownloadProgress {
 
 /**
  * Splits a large text into overlapping chunks suitable for embedding.
- *
- * @param text       - The full document text
- * @param chunkSize  - Target size per chunk (characters). Default: 500
- * @param overlap    - Characters of overlap between consecutive chunks. Default: 50
- * @returns          - Array of text chunks
- *
- * The overlap ensures that information at chunk boundaries isn't lost,
- * which improves retrieval quality in the RAG pipeline.
  */
 function chunkText(text: string, chunkSize = 500, overlap = 50): string[] {
   const chunks: string[] = [];
@@ -99,7 +58,6 @@ function chunkText(text: string, chunkSize = 500, overlap = 50): string[] {
       chunks.push(chunk);
     }
 
-    // Move the window forward, but keep `overlap` characters from the end
     start += chunkSize - overlap;
   }
 
@@ -110,29 +68,16 @@ function chunkText(text: string, chunkSize = 500, overlap = 50): string[] {
 // PDF Text Extraction — Uses pdf.js loaded from CDN
 // ---------------------------------------------------------------------------
 
-/**
- * Extracts all text from a PDF file using Mozilla's pdf.js library.
- * The library is loaded from a CDN only when needed (lazy loading).
- * All processing happens in the browser — the PDF never leaves the client.
- */
 async function extractPdfText(file: File): Promise<string> {
-  // Dynamically import pdf.js from CDN at runtime.
-  // We use Function constructor to bypass TypeScript's static module resolution,
-  // since this is a CDN URL, not an npm package.
   const cdnUrl = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/+esm";
   const pdfjsLib = await (new Function("url", "return import(url)"))(cdnUrl);
 
-  // Set the worker source for pdf.js (required for parsing)
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs";
 
-  // Read the file into an ArrayBuffer
   const arrayBuffer = await file.arrayBuffer();
-
-  // Load the PDF document
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  // Extract text from every page
   const pageTexts: string[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
@@ -149,8 +94,11 @@ async function extractPdfText(file: File): Promise<string> {
 // LocalEmbedder Component
 // ---------------------------------------------------------------------------
 
-export default function LocalEmbedder() {
-  // --- State ---
+export default function LocalEmbedder({
+  onEmbeddingsComplete,
+}: {
+  onEmbeddingsComplete?: (embeddings: EmbeddingResult[], fileName: string) => void;
+}) {
   const [status, setStatus] = useState<PipelineStatus>("idle");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
@@ -161,14 +109,11 @@ export default function LocalEmbedder() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedChunk, setExpandedChunk] = useState<number | null>(null);
 
-  // --- Refs ---
   const workerRef = useRef<Worker | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // --- Initialize Web Worker on mount ---
   useEffect(() => {
     return () => {
-      // Cleanup: terminate the worker when the component unmounts
       workerRef.current?.terminate();
     };
   }, []);
@@ -177,15 +122,9 @@ export default function LocalEmbedder() {
   // Worker Communication
   // ---------------------------------------------------------------------------
 
-  /**
-   * Creates (or reuses) the embedding Web Worker and sends chunks for processing.
-   * Listens for progress updates, status messages, results, and errors.
-   */
   const embedChunks = useCallback((textChunks: string[]) => {
-    // Terminate any existing worker
     workerRef.current?.terminate();
 
-    // Create a new worker from the worker file
     const worker = new Worker(
       new URL("../workers/embedding.worker.ts", import.meta.url),
       { type: "module" }
@@ -193,7 +132,6 @@ export default function LocalEmbedder() {
 
     workerRef.current = worker;
 
-    // Handle messages from the worker
     worker.onmessage = (event: MessageEvent) => {
       const data = event.data;
 
@@ -220,8 +158,9 @@ export default function LocalEmbedder() {
             `✓ Generated ${data.embeddings.length} embeddings (384 dimensions each)`
           );
           setDownloadProgress(null);
-
-          // Log to console for developer inspection
+          if (onEmbeddingsComplete && fileName) {
+            onEmbeddingsComplete(data.embeddings, fileName);
+          }
           console.group("🔒 Anchorium Local Embeddings");
           console.log("Model: Xenova/all-MiniLM-L6-v2 (384-dim)");
           console.log("Processing: 100% in-browser — zero data exfiltration");
@@ -248,25 +187,17 @@ export default function LocalEmbedder() {
       setStatusMessage(`Worker error: ${error.message}`);
     };
 
-    // Send the chunks to the worker for embedding
     setStatus("embedding");
     setStatusMessage("Preparing embedding pipeline...");
     worker.postMessage({ type: "embed", chunks: textChunks });
-  }, []);
+  }, [fileName, onEmbeddingsComplete]);
 
   // ---------------------------------------------------------------------------
   // File Processing Pipeline
   // ---------------------------------------------------------------------------
 
-  /**
-   * Handles the uploaded file:
-   *   1. Reads the file content (txt or pdf)
-   *   2. Splits it into overlapping chunks
-   *   3. Sends chunks to the Web Worker for embedding
-   */
   const processFile = useCallback(
     async (file: File) => {
-      // Validate file type
       const isText = file.name.endsWith(".txt");
       const isPdf = file.name.endsWith(".pdf");
 
@@ -276,7 +207,6 @@ export default function LocalEmbedder() {
         return;
       }
 
-      // Reset state
       setFileName(file.name);
       setEmbeddings([]);
       setExpandedChunk(null);
@@ -284,7 +214,6 @@ export default function LocalEmbedder() {
       setStatusMessage(`Reading ${file.name}...`);
 
       try {
-        // Step 1: Extract text from the file
         let text: string;
 
         if (isPdf) {
@@ -300,12 +229,10 @@ export default function LocalEmbedder() {
           return;
         }
 
-        // Step 2: Chunk the text
         const textChunks = chunkText(text);
         setChunks(textChunks);
         setStatusMessage(`Split into ${textChunks.length} chunk(s). Starting embedding...`);
 
-        // Step 3: Send to Web Worker for embedding
         embedChunks(textChunks);
       } catch (error) {
         setStatus("error");
@@ -356,6 +283,7 @@ export default function LocalEmbedder() {
   // ---------------------------------------------------------------------------
   // Helper: Format bytes to human-readable string
   // ---------------------------------------------------------------------------
+
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -367,6 +295,7 @@ export default function LocalEmbedder() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* ------------------------------------------------------------------ */}
@@ -384,7 +313,7 @@ export default function LocalEmbedder() {
           border-2 border-dashed transition-all duration-300
           ${
             isDragOver
-              ? "border-[var(--anchorium-cyan)] bg-[var(--surface-highlight)] scale-[1.01]"
+              ? "border-[var(--anchorium-gold)] bg-[var(--surface-highlight)] scale-[1.01]"
               : "border-[var(--border-default)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-highlight)]"
           }
         `}
@@ -395,7 +324,6 @@ export default function LocalEmbedder() {
           if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
         }}
       >
-        {/* Background glow effect */}
         <div
           className="absolute inset-0 opacity-0 transition-opacity duration-500 pointer-events-none"
           style={{
@@ -404,12 +332,11 @@ export default function LocalEmbedder() {
           }}
         />
 
-        {/* Upload icon */}
         <div className="relative z-10">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-[var(--surface-overlay)] flex items-center justify-center mb-4 border border-[var(--border-subtle)]">
             <svg
               className="w-8 h-8"
-              style={{ color: "var(--anchorium-cyan)" }}
+              style={{ color: "var(--anchorium-gold)" }}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -435,12 +362,11 @@ export default function LocalEmbedder() {
             — all processing happens locally in your browser
           </p>
 
-          {/* Privacy badge */}
           <div className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-full text-xs font-medium"
             style={{
-              background: "rgba(16, 185, 129, 0.1)",
-              color: "var(--anchorium-emerald)",
-              border: "1px solid rgba(16, 185, 129, 0.2)",
+              background: "rgba(212, 175, 55, 0.1)",
+              color: "var(--anchorium-gold)",
+              border: "1px solid rgba(212, 175, 55, 0.2)",
             }}
           >
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -454,7 +380,6 @@ export default function LocalEmbedder() {
           </div>
         </div>
 
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -474,29 +399,26 @@ export default function LocalEmbedder() {
           className="glass-panel rounded-[var(--radius-lg)] p-5 animate-fade-in"
           id="status-panel"
         >
-          {/* Status message */}
           <div className="flex items-center gap-3 mb-3">
-            {/* Spinner for loading states */}
             {(status === "reading-file" ||
               status === "loading-model" ||
               status === "embedding") && (
               <div
                 className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: "var(--anchorium-cyan)", borderTopColor: "transparent" }}
+                style={{ borderColor: "var(--anchorium-gold)", borderTopColor: "transparent" }}
               />
             )}
 
-            {/* Success icon */}
             {status === "complete" && (
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(16, 185, 129, 0.2)" }}
+                style={{ background: "rgba(212, 175, 55, 0.2)" }}
               >
                 <svg
                   className="w-3 h-3"
                   fill="none"
                   viewBox="0 0 24 24"
-                  stroke="var(--anchorium-emerald)"
+                  stroke="var(--anchorium-gold)"
                   strokeWidth={3}
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -504,7 +426,6 @@ export default function LocalEmbedder() {
               </div>
             )}
 
-            {/* Error icon */}
             {status === "error" && (
               <div className="w-5 h-5 rounded-full flex items-center justify-center bg-red-500/20">
                 <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -522,7 +443,6 @@ export default function LocalEmbedder() {
             </span>
           </div>
 
-          {/* Model download progress bar */}
           {downloadProgress && downloadProgress.total > 0 && (
             <div>
               <div className="flex justify-between text-xs mb-1.5" style={{ color: "var(--text-muted)" }}>
@@ -546,7 +466,6 @@ export default function LocalEmbedder() {
             </div>
           )}
 
-          {/* File info badge */}
           {fileName && (
             <div className="mt-3 flex items-center gap-2">
               <span
@@ -583,9 +502,9 @@ export default function LocalEmbedder() {
             <span
               className="text-xs px-2.5 py-1 rounded-full font-mono"
               style={{
-                background: "rgba(0, 212, 255, 0.1)",
-                color: "var(--anchorium-cyan)",
-                border: "1px solid rgba(0, 212, 255, 0.2)",
+                background: "rgba(212, 175, 55, 0.1)",
+                color: "var(--anchorium-gold)",
+                border: "1px solid rgba(212, 175, 55, 0.2)",
               }}
             >
               384-dim vectors
@@ -598,7 +517,6 @@ export default function LocalEmbedder() {
               className="glass-panel glass-panel-hover rounded-[var(--radius-md)] overflow-hidden transition-all duration-200"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              {/* Chunk header — clickable to expand */}
               <button
                 onClick={() =>
                   setExpandedChunk(expandedChunk === index ? null : index)
@@ -611,7 +529,7 @@ export default function LocalEmbedder() {
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
                     style={{
                       background: "var(--surface-overlay)",
-                      color: "var(--anchorium-cyan)",
+                      color: "var(--anchorium-gold)",
                     }}
                   >
                     {index + 1}
@@ -639,13 +557,11 @@ export default function LocalEmbedder() {
                 </svg>
               </button>
 
-              {/* Expanded details */}
               {expandedChunk === index && (
                 <div
                   className="px-4 pb-4 space-y-3 animate-fade-in border-t"
                   style={{ borderColor: "var(--border-subtle)" }}
                 >
-                  {/* Full chunk text */}
                   <div className="mt-3">
                     <div
                       className="text-xs font-semibold uppercase tracking-wider mb-1.5"
@@ -664,7 +580,6 @@ export default function LocalEmbedder() {
                     </p>
                   </div>
 
-                  {/* Vector preview */}
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wider mb-1.5"
@@ -676,7 +591,7 @@ export default function LocalEmbedder() {
                       className="font-mono text-xs p-3 rounded-lg overflow-x-auto"
                       style={{
                         background: "var(--surface-overlay)",
-                        color: "var(--anchorium-cyan)",
+                        color: "var(--anchorium-gold)",
                       }}
                     >
                       [{embedding.vector.slice(0, 8).map((v) => v.toFixed(6)).join(", ")}
@@ -684,7 +599,6 @@ export default function LocalEmbedder() {
                     </div>
                   </div>
 
-                  {/* Vector magnitude (useful for debugging) */}
                   <div className="flex gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
                     <span>
                       Magnitude:{" "}
