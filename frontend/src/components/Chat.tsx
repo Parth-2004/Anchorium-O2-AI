@@ -31,6 +31,7 @@ interface EmbeddingResult {
   text: string;
   vector: number[];
   documentName?: string;
+  isRegulatory?: boolean;
 }
 
 interface ChatMessage {

@@ -22,6 +22,7 @@ interface EmbeddingResult {
   text: string;
   vector: number[];
   documentName?: string;
+  isRegulatory?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +155,8 @@ export default function Home() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [transitionPhase, setTransitionPhase] = useState<"none" | "fading" | "entering">("none");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isRegulatoryLoaded, setIsRegulatoryLoaded] = useState(false);
+  const [isRegulatoryLoading, setIsRegulatoryLoading] = useState(false);
 
   const handleEmbeddingsComplete = (newEmbeddings: EmbeddingResult[], newFileName: string, isLast: boolean) => {
     setEmbeddings((prev) => {
@@ -182,7 +185,43 @@ export default function Home() {
     }
   };
 
+  const handleToggleRegulatory = async () => {
+    if (isRegulatoryLoaded) {
+      setDocuments((prev) => prev.filter((d) => d.id !== "regulatory-db"));
+      setEmbeddings((prev) => prev.filter((chunk) => !chunk.isRegulatory));
+      setIsRegulatoryLoaded(false);
+    } else {
+      setIsRegulatoryLoading(true);
+      try {
+        const res = await fetch("/regulatory_embeddings.json");
+        if (!res.ok) throw new Error("Failed to load regulatory data.");
+        const data: EmbeddingResult[] = await res.json();
+        const dataWithFlag = data.map(d => ({ ...d, isRegulatory: true }));
+        
+        setEmbeddings((prev) => [...prev, ...dataWithFlag]);
+        setDocuments((prev) => [
+          ...prev,
+          {
+            id: "regulatory-db",
+            fileName: "Verified Indian Regulatory Database (20 PDFs)",
+            chunksCount: data.length,
+          }
+        ]);
+        setIsRegulatoryLoaded(true);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to load Regulatory Knowledge Base. Ensure it is generated.");
+      } finally {
+        setIsRegulatoryLoading(false);
+      }
+    }
+  };
+
   const handleRemoveDocument = (docId: string) => {
+    if (docId === "regulatory-db") {
+      handleToggleRegulatory();
+      return;
+    }
     const docToRemove = documents.find((d) => d.id === docId);
     if (!docToRemove) return;
 
@@ -376,6 +415,35 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+
+                {/* Regulatory Database Toggle */}
+                <button
+                  onClick={handleToggleRegulatory}
+                  disabled={isRegulatoryLoading}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 mb-3"
+                  style={{
+                    background: isRegulatoryLoaded ? "var(--gradient-primary)" : "var(--surface-overlay)",
+                    color: isRegulatoryLoaded ? "#000" : "var(--text-primary)",
+                    border: isRegulatoryLoaded ? "none" : "1px solid var(--border-subtle)",
+                    boxShadow: isRegulatoryLoaded ? "0 0 16px rgba(212, 175, 55, 0.2)" : "none",
+                  }}
+                >
+                  <div className="flex flex-col items-start text-left">
+                    <span className="text-[11px] uppercase tracking-[0.1em] font-bold">
+                      {isRegulatoryLoaded ? "✓ Regulatory DB Active" : "Regulatory DB (20 PDFs)"}
+                    </span>
+                    <span className="text-[9px] opacity-70" style={{ color: isRegulatoryLoaded ? "#333" : "var(--text-muted)" }}>
+                      Verified Indian Regulatory Framework
+                    </span>
+                  </div>
+                  {isRegulatoryLoading ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: isRegulatoryLoaded ? "#000" : "var(--anchorium-gold)", borderTopColor: "transparent" }} />
+                  ) : (
+                    <div className="w-8 h-4 rounded-full flex items-center p-0.5 transition-all" style={{ background: isRegulatoryLoaded ? "rgba(0,0,0,0.5)" : "var(--surface-highlight)" }}>
+                      <div className={`w-3 h-3 rounded-full bg-white transition-all ${isRegulatoryLoaded ? "translate-x-4" : "translate-x-0"}`} />
+                    </div>
+                  )}
+                </button>
 
                 {/* Upload More Button */}
                 <button
