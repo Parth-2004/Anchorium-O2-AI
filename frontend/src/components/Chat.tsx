@@ -215,8 +215,8 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEmbeddingQuery, setIsEmbeddingQuery] = useState(false);
 
-  // --- Refs ---
   const queryWorkerRef = useRef<Worker | null>(null);
+  const chatWorkerRef = useRef<Worker | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -229,6 +229,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
   useEffect(() => {
     return () => {
       queryWorkerRef.current?.terminate();
+      chatWorkerRef.current?.terminate();
     };
   }, []);
 
@@ -324,8 +325,8 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
           },
         ]);
 
-        // Step 5: Stream from backend
-        await streamFromBackend(endpoint, assembledPrompt, relevantChunks, assistantId);
+        // Step 5: Stream from local LLM
+        await streamFromLocalWorker(query, contextText, relevantChunks, assistantId);
       } catch (error) {
         setIsEmbeddingQuery(false);
         setMessages((prev) => [
@@ -348,62 +349,78 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
   // Stream Response from Backend (SSE)
   // ---------------------------------------------------------------------------
 
-  async function streamFromBackend(
-    endpoint: string,
-    prompt: string,
+  async function streamFromLocalWorker(
+    query: string,
+    contextText: string,
     relevantChunks: { text: string; score: number; documentName?: string }[],
     messageId: string
   ) {
-    // MOCK IMPLEMENTATION as requested for Phase 2:
-    // Simulating a streaming SSE response from an LLM.
-    
-    // Extract unique active documents currently in the vault
-    const activeDocNames = Array.from(
-      new Set(contextChunks.map((c) => c.documentName).filter((name): name is string => !!name))
-    );
-    const docListStr = activeDocNames.length > 0
-      ? activeDocNames.map((name) => `"${name}"`).join(", ")
-      : "your uploaded documents";
-
-    // Generate a mock response based on the endpoint and active documents
-    let mockResponse = "";
-    if (endpoint.includes("underwrite")) {
-      mockResponse = `### Multi-Document GAAP to IndAS Conversion\n\nI have cross-analyzed the financial data across **${documentsLabel(activeDocNames)}** under local zero-knowledge mode.\n\nHere is the consolidated line-by-line mapping:\n\n1. **Revenue Recognition**\n   - *US GAAP*: Recognized under ASC 606\n   - *IndAS*: Recognized under IndAS 115\n   - *Adjustment*: None required materially based on retrieved context from ${activeDocNames[0] || "documents"}.\n\n2. **Leases**\n   - *US GAAP*: Operating leases capitalized (ASC 842)\n   - *IndAS*: Single lessee accounting model (IndAS 116)\n\n*Note*: All math calculations have been verified with 0.0 temperature accuracy.`;
-    } else if (endpoint.includes("compliance")) {
-      mockResponse = `### RBI & FEMA Compliance Audit\n\nI have audited **${documentsLabel(activeDocNames)}** against FEMA regulatory framework.\n\n⚠️ **Compliance Flag**: Pricing guidelines for share transfers mentioned in ${activeDocNames[0] || "the documents"} require a certified valuation report.\n\n**Action Items**:\n1. Ensure FC-GPR is filed within 30 days of allotment.\n2. Verify Pricing Guidelines compliance as per RBI Master Directions.\n3. File FEMA Annual Return.`;
-    } else if (endpoint.includes("arbitrage")) {
-      mockResponse = `### USD-INR Arbitrage Simulation\n\nCalculating the cheapest all-in cost pathways based on the cost structures extracted from **${documentsLabel(activeDocNames)}**:\n\n1. **Direct INR Borrowing**: ~8.5% p.a.\n2. **ECB (USD) fully hedged**: ~4.2% (SOFR) + 2.0% (Spread) + 2.5% (6m fwd premium) = ~8.7% p.a.\n3. **ECB (USD) unhedged**: ~6.2% p.a. *(High FX Risk)*\n\n*Recommendation*: Direct INR borrowing is currently more capital efficient due to elevated hedging costs.`;
-    } else {
-      mockResponse = `### Cross-Document India Soft-Landing Playbook\n\nBased on the analysis of **${documentsLabel(activeDocNames)}**, here is your customized landing playbook:\n\n1. **Entity Structure**: Private Limited Company (Subsidiary)\n2. **Capital Infusion**: 100% FDI under automatic route is permitted for your sector.\n3. **Banking**: Recommended to open a nodal account with a Tier 1 foreign bank in India to streamline initial capital inflow.\n\n*Estimated Timeline*: 4-6 weeks for full operational readiness.`;
-    }
-
     if (relevantChunks.length === 0) {
-      mockResponse = "⚠️ Insufficient data provided in the uploaded documents to answer this question accurately. Please upload documents containing relevant financial information.";
-    }
-
-    // Helper helper function
-    function documentsLabel(names: string[]) {
-      if (names.length === 0) return "uploaded documents";
-      if (names.length === 1) return `"${names[0]}"`;
-      return `${names.length} documents (${names.map((n) => `"${n}"`).join(", ")})`;
-    }
-
-    // Simulate streaming the response word by word
-    const words = mockResponse.split(" ");
-    let currentContent = "";
-    
-    for (let i = 0; i < words.length; i++) {
-      // Add artificial delay to simulate streaming (10-30ms per word)
-      await new Promise((resolve) => setTimeout(resolve, 10 + Math.random() * 20));
-      
-      currentContent += words[i] + (i < words.length - 1 ? " " : "");
-      
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === messageId ? { ...m, content: currentContent } : m
+          m.id === messageId ? { ...m, content: "⚠️ Insufficient data provided in the uploaded documents to answer this question accurately. Please upload documents containing relevant financial information." } : m
         )
       );
+      return;
     }
+
+    return new Promise<void>((resolve, reject) => {
+      if (!chatWorkerRef.current) {
+        chatWorkerRef.current = new Worker(
+          new URL("../workers/chat-generation.worker.ts", import.meta.url),
+          { type: "module" }
+        );
+      }
+
+      const worker = chatWorkerRef.current;
+      let currentContent = "";
+      let hasStartedStreaming = false;
+
+      const handler = (event: MessageEvent) => {
+        const { type, messageId: eventMessageId, text, message } = event.data;
+
+        if (type === "status") {
+          console.log("[Local LLM Status]:", message);
+          if (!hasStartedStreaming) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId ? { ...m, content: `*[System]: ${message}*` } : m
+              )
+            );
+          }
+        } else if (type === "stream-chunk" && eventMessageId === messageId) {
+          hasStartedStreaming = true;
+          currentContent += text;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId ? { ...m, content: currentContent } : m
+            )
+          );
+        } else if (type === "stream-complete" && eventMessageId === messageId) {
+          worker.removeEventListener("message", handler);
+          resolve();
+        } else if (type === "error" && eventMessageId === messageId) {
+          worker.removeEventListener("message", handler);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId ? { ...m, content: `⚠️ Error communicating with Local AI model: ${message}` } : m
+            )
+          );
+          reject(new Error(message));
+        }
+      };
+
+      worker.addEventListener("message", handler);
+      
+      worker.postMessage({
+        type: "generate",
+        messageId,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `=== RETRIEVED CONTEXT ===\n${contextText}\n\n=== USER QUERY ===\n${query}` }
+        ]
+      });
+    });
   }
 
   // ---------------------------------------------------------------------------

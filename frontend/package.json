@@ -10,6 +10,7 @@
     "embed:regulatory": "node scripts/precompute_embeddings.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@huggingface/transformers": "^4.2.0",
     "next": "16.2.9",
     "react": "19.2.4",
