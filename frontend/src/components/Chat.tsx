@@ -299,17 +299,10 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
         const queryVector = await embedQueryLocally(query);
         setIsEmbeddingQuery(false);
 
-        // Step 2: Cosine similarity search
-        const relevantChunks = semanticSearch(queryVector, contextChunks, 5, 0.3);
+        // Step 2: Cosine similarity search — cast a wide net for regulatory docs
+        const relevantChunks = semanticSearch(queryVector, contextChunks, 10, 0.2);
 
-        // Step 3: Assemble strict RAG prompt
-        const contextText = relevantChunks.length > 0
-          ? relevantChunks
-              .map((c, i) => `--- Chunk ${i + 1} from Document: "${c.documentName || "Unknown"}" (${(c.score * 100).toFixed(1)}% match) ---\n${c.text}`)
-              .join("\n\n")
-          : "No relevant context found in the uploaded documents.";
-
-        const assembledPrompt = `${SYSTEM_PROMPT}\n\n=== RETRIEVED CONTEXT ===\n${contextText}\n\n=== USER QUERY ===\n${query}`;
+        // Step 3: Context is now passed as structured chunks to the synthesis engine
 
         // Step 4: Add placeholder assistant message
         const assistantId = `assistant-${Date.now()}`;
@@ -325,8 +318,8 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
           },
         ]);
 
-        // Step 5: Stream from local LLM
-        await streamFromLocalWorker(query, contextText, relevantChunks, assistantId);
+        // Step 5: Stream from local extractive RAG synthesis engine
+        await streamFromLocalWorker(query, relevantChunks, assistantId, agentType);
       } catch (error) {
         setIsEmbeddingQuery(false);
         setMessages((prev) => [
@@ -351,9 +344,9 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
 
   async function streamFromLocalWorker(
     query: string,
-    contextText: string,
     relevantChunks: { text: string; score: number; documentName?: string }[],
-    messageId: string
+    messageId: string,
+    agentType: string = "RAG"
   ) {
     if (relevantChunks.length === 0) {
       setMessages((prev) =>
@@ -380,11 +373,11 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
         const { type, messageId: eventMessageId, text, message } = event.data;
 
         if (type === "status") {
-          console.log("[Local LLM Status]:", message);
+          console.log("[RAG Synthesis Engine]:", message);
           if (!hasStartedStreaming) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === messageId ? { ...m, content: `*[System]: ${message}*` } : m
+                m.id === messageId ? { ...m, content: `*Analyzing ${relevantChunks.length} document chunks...*` } : m
               )
             );
           }
@@ -403,7 +396,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
           worker.removeEventListener("message", handler);
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === messageId ? { ...m, content: `⚠️ Error communicating with Local AI model: ${message}` } : m
+              m.id === messageId ? { ...m, content: `⚠️ Synthesis Error: ${message}` } : m
             )
           );
           reject(new Error(message));
@@ -411,14 +404,14 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
       };
 
       worker.addEventListener("message", handler);
-      
+
+      // Send query + raw chunks + agent type to the synthesis engine
       worker.postMessage({
         type: "generate",
         messageId,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `=== RETRIEVED CONTEXT ===\n${contextText}\n\n=== USER QUERY ===\n${query}` }
-        ]
+        query,
+        chunks: relevantChunks,
+        agentType,
       });
     });
   }
