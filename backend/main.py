@@ -18,15 +18,14 @@ SECURITY NOTE:
 from __future__ import annotations
 
 import json
-import traceback
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +46,7 @@ async def lifespan(app: FastAPI):
     # Validate prompt registry on startup
     try:
         from rag_pipeline.prompts.registry import AgentPromptRegistry
+
         validation = AgentPromptRegistry.validate_all()
         all_valid = all(validation.values())
         print(f"   ✓ Prompt Registry: {len(validation)} agents registered")
@@ -87,7 +87,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",   # Next.js dev server
+        "http://localhost:3000",  # Next.js dev server
         "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
@@ -101,48 +101,54 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 class EmbeddedChunk(BaseModel):
     """A chunk of text with its embedding vector and metadata"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
     text: str
-    vector: List[float] = Field(default_factory=list)
-    documentName: Optional[str] = None
-    score: Optional[float] = None
+    vector: list[float] = Field(default_factory=list)
+    document_name: str | None = Field(default=None, alias="documentName")
+    score: float | None = None
 
 
 class QueryRequest(BaseModel):
     """Request model for querying the RAG pipeline"""
+
     query: str
-    context_chunks: List[EmbeddedChunk] = Field(default_factory=list)
-    system_prompt: Optional[str] = None
-    agent_type: Optional[str] = None
+    context_chunks: list[EmbeddedChunk] = Field(default_factory=list)
+    system_prompt: str | None = None
+    agent_type: str | None = None
 
 
 class FounderOnboardingRequest(BaseModel):
     """Request model for the full orchestrated pipeline."""
+
     query: str
-    context_chunks: List[EmbeddedChunk] = Field(default_factory=list)
-    founder_country: Optional[str] = None
-    entity_type_abroad: Optional[str] = None
-    annual_revenue: Optional[str] = None
-    capital_source: Optional[str] = None
-    proposed_india_activity: Optional[str] = None
-    headcount_planned: Optional[int] = None
-    collateral_type: Optional[str] = None
-    collateral_value: Optional[str] = None
+    context_chunks: list[EmbeddedChunk] = Field(default_factory=list)
+    founder_country: str | None = None
+    entity_type_abroad: str | None = None
+    annual_revenue: str | None = None
+    capital_source: str | None = None
+    proposed_india_activity: str | None = None
+    headcount_planned: int | None = None
+    collateral_type: str | None = None
+    collateral_value: str | None = None
 
 
 class TrustScoreRequest(BaseModel):
     """Request model for the Global Trust Score agent."""
+
     query: str
-    context_chunks: List[EmbeddedChunk] = Field(default_factory=list)
+    context_chunks: list[EmbeddedChunk] = Field(default_factory=list)
     # Financial profile data
-    foreign_bureau_score: Optional[int] = None
-    annual_revenue_usd: Optional[float] = None
-    revenue_growth_yoy: Optional[float] = None
-    collateral_type: Optional[str] = None
-    collateral_value_usd: Optional[float] = None
-    credit_history_years: Optional[int] = None
-    existing_debt_usd: Optional[float] = None
-    total_assets_usd: Optional[float] = None
-    industry_vertical: Optional[str] = None
+    foreign_bureau_score: int | None = None
+    annual_revenue_usd: float | None = None
+    revenue_growth_yoy: float | None = None
+    collateral_type: str | None = None
+    collateral_value_usd: float | None = None
+    credit_history_years: int | None = None
+    existing_debt_usd: float | None = None
+    total_assets_usd: float | None = None
+    industry_vertical: str | None = None
     has_indian_credit_history: bool = False
 
 
@@ -150,12 +156,13 @@ class TrustScoreRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _chunks_to_dicts(chunks: List[EmbeddedChunk]) -> list[dict[str, Any]]:
+
+def _chunks_to_dicts(chunks: list[EmbeddedChunk]) -> list[dict[str, Any]]:
     """Convert Pydantic EmbeddedChunk models to plain dicts for agents."""
     return [
         {
             "text": c.text,
-            "documentName": c.documentName or "Unknown",
+            "documentName": c.document_name or "Unknown",
             "score": c.score or 0.0,
         }
         for c in chunks
@@ -163,10 +170,16 @@ def _chunks_to_dicts(chunks: List[EmbeddedChunk]) -> list[dict[str, Any]]:
     ]
 
 
+def _sse(payload: dict[str, Any]) -> str:
+    """Serialize one server-sent event payload."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
 def _get_orchestrator():
     """Lazily initialize the MasterOrchestrator."""
-    from pydantic import SecretStr
     import os
+
+    from pydantic import SecretStr
 
     from rag_pipeline.agents.orchestrator import MasterOrchestrator
     from rag_pipeline.config import GenerationConfig
@@ -197,8 +210,8 @@ async def _stream_agent_response(
       data: {"type": "disclaimer", "text": "..."}
       data: {"type": "done"}
     """
-    yield f'data: {json.dumps({"type": "thinking"})}\n\n'
-    yield f'data: {json.dumps({"type": "agent", "agent": agent_name})}\n\n'
+    yield _sse({"type": "thinking"})
+    yield _sse({"type": "agent", "agent": agent_name})
 
     try:
         orchestrator = _get_orchestrator()
@@ -210,31 +223,42 @@ async def _stream_agent_response(
         )
 
         # Stream the main answer
-        yield f'data: {json.dumps({"type": "content", "content": output.answer})}\n\n'
+        yield _sse({"type": "content", "content": output.answer})
 
         # Stream structured data
         if output.structured_data:
-            yield f'data: {json.dumps({"type": "structured", "data": output.structured_data})}\n\n'
+            yield _sse({"type": "structured", "data": output.structured_data})
 
         # Stream confidence tier
-        yield f'data: {json.dumps({"type": "confidence", "tier": output.confidence_tier.value, "requires_ca_review": output.requires_ca_review})}\n\n'
+        yield _sse(
+            {
+                "type": "confidence",
+                "tier": output.confidence_tier.value,
+                "requires_ca_review": output.requires_ca_review,
+            }
+        )
 
         # Stream disclaimer if present
         if output.disclaimer:
-            yield f'data: {json.dumps({"type": "disclaimer", "text": output.disclaimer})}\n\n'
+            yield _sse({"type": "disclaimer", "text": output.disclaimer})
 
         # Stream draft banner
-        yield f'data: {json.dumps({"type": "banner", "text": output.draft_banner})}\n\n'
+        yield _sse({"type": "banner", "text": output.draft_banner})
 
         # Cross-border data flag
         if output.cross_border_data_flag:
-            yield f'data: {json.dumps({"type": "warning", "text": "⚠️ Cross-border data transfer flagged. Review required before proceeding."})}\n\n'
+            yield _sse(
+                {
+                    "type": "warning",
+                    "text": "⚠️ Cross-border data transfer flagged. Review required before proceeding.",
+                }
+            )
 
-        yield f'data: {json.dumps({"type": "done"})}\n\n'
+        yield _sse({"type": "done"})
 
     except Exception as e:
         error_msg = f"Agent {agent_name} error: {str(e)}"
-        yield f'data: {json.dumps({"type": "error", "message": error_msg})}\n\n'
+        yield _sse({"type": "error", "message": error_msg})
 
 
 async def _stream_pipeline_response(
@@ -242,9 +266,9 @@ async def _stream_pipeline_response(
     context_chunks: list[dict[str, Any]],
 ) -> AsyncGenerator[str, None]:
     """Run the full orchestrated pipeline and stream results."""
-    yield f'data: {json.dumps({"type": "thinking"})}\n\n'
-    yield f'data: {json.dumps({"type": "agent", "agent": "orchestrator"})}\n\n'
-    yield f'data: {json.dumps({"type": "status", "message": "Starting multi-agent pipeline..."})}\n\n'
+    yield _sse({"type": "thinking"})
+    yield _sse({"type": "agent", "agent": "orchestrator"})
+    yield _sse({"type": "status", "message": "Starting multi-agent pipeline..."})
 
     try:
         orchestrator = _get_orchestrator()
@@ -255,25 +279,31 @@ async def _stream_pipeline_response(
 
         # Stream each agent's output
         for agent_name, output in result.agent_outputs.items():
-            yield f'data: {json.dumps({"type": "status", "message": f"Agent completed: {agent_name}"})}\n\n'
+            yield _sse({"type": "status", "message": f"Agent completed: {agent_name}"})
 
         # Stream the assembled report
-        yield f'data: {json.dumps({"type": "content", "content": result.assembled_report})}\n\n'
+        yield _sse({"type": "content", "content": result.assembled_report})
 
         # Stream overall metadata
-        yield f'data: {json.dumps({"type": "confidence", "tier": result.overall_confidence.value, "requires_ca_review": result.requires_ca_review})}\n\n'
+        yield _sse(
+            {
+                "type": "confidence",
+                "tier": result.overall_confidence.value,
+                "requires_ca_review": result.requires_ca_review,
+            }
+        )
 
         if result.requires_ca_review:
-            yield f'data: {json.dumps({"type": "warning", "text": "⚠️ REQUIRES CA REVIEW BEFORE CLIENT DELIVERY"})}\n\n'
+            yield _sse({"type": "warning", "text": "⚠️ REQUIRES CA REVIEW BEFORE CLIENT DELIVERY"})
 
         # Stream audit trail
-        yield f'data: {json.dumps({"type": "audit", "data": result.audit_trail})}\n\n'
+        yield _sse({"type": "audit", "data": result.audit_trail})
 
-        yield f'data: {json.dumps({"type": "done"})}\n\n'
+        yield _sse({"type": "done"})
 
     except Exception as e:
         error_msg = f"Pipeline error: {str(e)}"
-        yield f'data: {json.dumps({"type": "error", "message": error_msg})}\n\n'
+        yield _sse({"type": "error", "message": error_msg})
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +337,7 @@ async def health_check():
 # ---------------------------------------------------------------------------
 # Agent Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.post("/api/v1/query", tags=["RAG"])
 async def query_rag(request: QueryRequest):

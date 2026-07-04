@@ -232,10 +232,7 @@ class ComplianceGenerator:
         context_block = self._build_context_block(working_chunks)
         user_message = self._build_user_message(query, context_block)
 
-        total_tokens = (
-            self._count_tokens(system_prompt)
-            + self._count_tokens(user_message)
-        )
+        total_tokens = self._count_tokens(system_prompt) + self._count_tokens(user_message)
 
         while total_tokens > self._config.context_window_limit and len(working_chunks) > 1:
             removed = working_chunks.pop()
@@ -247,10 +244,7 @@ class ComplianceGenerator:
             )
             context_block = self._build_context_block(working_chunks)
             user_message = self._build_user_message(query, context_block)
-            total_tokens = (
-                self._count_tokens(system_prompt)
-                + self._count_tokens(user_message)
-            )
+            total_tokens = self._count_tokens(system_prompt) + self._count_tokens(user_message)
 
         if total_tokens > self._config.context_window_limit:
             self._log.error(
@@ -260,10 +254,7 @@ class ComplianceGenerator:
             )
             return self._refusal_response(
                 query=query,
-                reason=(
-                    "The minimum context required exceeds the model's context "
-                    "window limit even after truncation."
-                ),
+                reason=("The minimum context required exceeds the model's context window limit even after truncation."),
             )
 
         self._log.debug(
@@ -334,8 +325,7 @@ class ComplianceGenerator:
             validation_result=last_validation,
             is_verified=False,
             refusal_reason=(
-                f"Hallucination validation failed after {max_attempts} attempts. "
-                f"Unsupported claims: {failed_summary}"
+                f"Hallucination validation failed after {max_attempts} attempts. Unsupported claims: {failed_summary}"
             ),
             generation_attempts=max_attempts,
             model_used=self._config.model_name,
@@ -574,10 +564,7 @@ class ComplianceGenerator:
         """Build a refusal ``ComplianceResponse`` when generation is skipped."""
         return ComplianceResponse(
             query=query,
-            answer=(
-                "I cannot provide a definitive answer based on the available "
-                "regulatory documents."
-            ),
+            answer=("I cannot provide a definitive answer based on the available regulatory documents."),
             citations=[],
             validation_result=ValidationResult(
                 is_valid=False,
@@ -646,12 +633,9 @@ class HallucinationValidator:
             return ValidationResult(
                 is_valid=False,
                 confidence_score=0.0,
-                failed_claims=[
-                    "No citations were provided to substantiate the answer."
-                ],
+                failed_claims=["No citations were provided to substantiate the answer."],
                 reasoning=(
-                    "The generated answer did not include any citations. "
-                    "All factual claims are therefore unverified."
+                    "The generated answer did not include any citations. All factual claims are therefore unverified."
                 ),
             )
 
@@ -781,8 +765,7 @@ class HallucinationValidator:
                 {
                     "role": "system",
                     "content": (
-                        "You are a meticulous Regulatory Compliance "
-                        "Validation Agent. Respond ONLY with valid JSON."
+                        "You are a meticulous Regulatory Compliance Validation Agent. Respond ONLY with valid JSON."
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -830,9 +813,7 @@ class HallucinationValidator:
             return ValidationResult(
                 is_valid=False,
                 confidence_score=0.0,
-                failed_claims=[
-                    "Validation response could not be parsed as JSON."
-                ],
+                failed_claims=["Validation response could not be parsed as JSON."],
                 reasoning=f"JSON parse error: {exc}. Raw: {raw_response[:300]}",
             )
 
@@ -844,9 +825,7 @@ class HallucinationValidator:
             return ValidationResult(
                 is_valid=False,
                 confidence_score=0.0,
-                failed_claims=[
-                    "Validation response was not a JSON object."
-                ],
+                failed_claims=["Validation response was not a JSON object."],
                 reasoning=f"Expected dict, got {type(data).__name__}.",
             )
 

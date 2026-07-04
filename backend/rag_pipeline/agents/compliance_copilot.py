@@ -44,22 +44,15 @@ class ComplianceCopilotAgent(BaseAgent):
         if context_chunks:
             context_block = self._build_context_block(context_chunks)
             parts.append(
-                "REGULATORY SOURCE CHUNKS:\n"
-                "========================\n\n"
-                f"{context_block}\n\n"
-                "========================"
+                f"REGULATORY SOURCE CHUNKS:\n========================\n\n{context_block}\n\n========================"
             )
 
         if input_data:
-            parts.append(
-                "FOUNDER PROFILE DATA (from KYC extraction):\n"
-                f"{_format_input_data(input_data)}"
-            )
+            parts.append(f"FOUNDER PROFILE DATA (from KYC extraction):\n{_format_input_data(input_data)}")
 
         parts.append(f"COMPLIANCE QUERY:\n{query}")
         parts.append(
-            "Provide your analysis as a JSON object following the "
-            "output format specified in your system instructions."
+            "Provide your analysis as a JSON object following the output format specified in your system instructions."
         )
 
         user_message = "\n\n".join(parts)
@@ -94,9 +87,7 @@ class ComplianceCopilotAgent(BaseAgent):
             answer=data.get("answer", raw_response),
             structured_data=data,
             confidence_tier=overall,
-            requires_ca_review=overall != ConfidenceTier.HIGH or bool(
-                data.get("open_questions_for_ca_review")
-            ),
+            requires_ca_review=overall != ConfidenceTier.HIGH or bool(data.get("open_questions_for_ca_review")),
             model_used=self._config.model_name,
             raw_response=raw_response,
         )

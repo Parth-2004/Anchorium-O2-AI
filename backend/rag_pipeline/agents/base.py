@@ -257,13 +257,7 @@ class BaseAgent(ABC):
                 text = chunk.get("text", "")
                 doc_name = chunk.get("documentName", f"Source {idx}")
                 score = chunk.get("score", 0.0)
-                block = (
-                    f"[Source {idx}] (Document: {doc_name}, "
-                    f"Relevance: {score:.3f})\n"
-                    f"---\n"
-                    f"{text}\n"
-                    f"---"
-                )
+                block = f"[Source {idx}] (Document: {doc_name}, Relevance: {score:.3f})\n---\n{text}\n---"
             else:
                 block = f"[Source {idx}]\n---\n{chunk}\n---"
             blocks.append(block)

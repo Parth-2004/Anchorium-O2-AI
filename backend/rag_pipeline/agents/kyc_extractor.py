@@ -45,10 +45,7 @@ class KycExtractorAgent(BaseAgent):
         if context_chunks:
             context_block = self._build_context_block(context_chunks)
             parts.append(
-                "UPLOADED DOCUMENT CONTENT:\n"
-                "========================\n\n"
-                f"{context_block}\n\n"
-                "========================"
+                f"UPLOADED DOCUMENT CONTENT:\n========================\n\n{context_block}\n\n========================"
             )
 
         parts.append(f"EXTRACTION REQUEST:\n{query}")
@@ -98,9 +95,7 @@ class KycExtractorAgent(BaseAgent):
             answer=data.get("answer", raw_response),
             structured_data=data,
             confidence_tier=overall,
-            requires_ca_review=overall != ConfidenceTier.HIGH or bool(
-                data.get("flagged_for_human_review")
-            ),
+            requires_ca_review=overall != ConfidenceTier.HIGH or bool(data.get("flagged_for_human_review")),
             cross_border_data_flag=cross_border,
             model_used=self._config.model_name,
             raw_response=raw_response,

@@ -202,9 +202,7 @@ class EmbeddingService:
         """Call OpenAI embeddings API with tenacity retry."""
 
         @retry(
-            retry=retry_if_exception_type(
-                (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)
-            ),
+            retry=retry_if_exception_type((openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)),
             wait=wait_exponential(multiplier=1, min=1, max=60),
             stop=stop_after_attempt(self._config.max_retries),
             reraise=True,
@@ -360,9 +358,7 @@ class PineconeIndexer:
             start_pos = batch_idx * batch_size
             end_pos = start_pos + batch_size
             batch = records[start_pos:end_pos]
-            vectors = [
-                (rec.chunk_id, rec.embedding, rec.pinecone_metadata) for rec in batch
-            ]
+            vectors = [(rec.chunk_id, rec.embedding, rec.pinecone_metadata) for rec in batch]
             try:
                 self._upsert_batch_with_retry(index, vectors)
                 success_count += len(batch)
@@ -693,9 +689,7 @@ class BM25IndexManager:
             RuntimeError: If the index has not been built yet.
         """
         if self._bm25 is None:
-            raise RuntimeError(
-                "Cannot save: BM25 index has not been built. Call build_index() first."
-            )
+            raise RuntimeError("Cannot save: BM25 index has not been built. Call build_index() first.")
 
         index_path.parent.mkdir(parents=True, exist_ok=True)
         chunks_path.parent.mkdir(parents=True, exist_ok=True)
@@ -766,17 +760,14 @@ class BM25IndexManager:
             RuntimeError: If the index has not been built or loaded.
         """
         if self._bm25 is None or not self._chunks:
-            raise RuntimeError(
-                "BM25 index is empty. Call build_index() or load_index() first."
-            )
+            raise RuntimeError("BM25 index is empty. Call build_index() or load_index() first.")
 
         tokenized_query = self._tokenize(query)
         scores = self._bm25.get_scores(tokenized_query)
 
         # Pair each chunk with its score, sort descending, return top_k.
         scored_chunks: list[tuple[DocumentChunk, float]] = [
-            (chunk, float(score))
-            for chunk, score in zip(self._chunks, scores, strict=False)
+            (chunk, float(score)) for chunk, score in zip(self._chunks, scores, strict=False)
         ]
         scored_chunks.sort(key=lambda pair: pair[1], reverse=True)
         return scored_chunks[:top_k]
@@ -851,7 +842,8 @@ def _flatten_chunk_metadata(chunk: DocumentChunk) -> dict[str, Any]:
     if chunk.metadata is not None:
         doc_meta = chunk.metadata
         meta["document_title"] = doc_meta.document_title
-        meta["issuing_body"] = doc_meta.issuing_body.value if hasattr(doc_meta.issuing_body, "value") else str(doc_meta.issuing_body)
+        issuing_body = doc_meta.issuing_body
+        meta["issuing_body"] = issuing_body.value if hasattr(issuing_body, "value") else str(issuing_body)
         meta["circular_number"] = doc_meta.circular_number
         meta["is_active"] = doc_meta.is_active
         meta["version"] = doc_meta.version

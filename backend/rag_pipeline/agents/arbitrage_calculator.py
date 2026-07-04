@@ -51,10 +51,7 @@ class ArbitrageCalculatorAgent(BaseAgent):
             )
 
         if input_data:
-            parts.append(
-                "INPUT DATA (from upstream agents):\n"
-                f"{_format_arbitrage_input(input_data)}"
-            )
+            parts.append(f"INPUT DATA (from upstream agents):\n{_format_arbitrage_input(input_data)}")
 
         parts.append(f"ARBITRAGE ANALYSIS REQUEST:\n{query}")
         parts.append(
@@ -80,8 +77,7 @@ class ArbitrageCalculatorAgent(BaseAgent):
             data["answer"] = (
                 "⚠️ WARNING: The model failed to produce a mandatory downside "
                 "scenario. This output is incomplete and must not be used for "
-                "decision-making without CA review.\n\n"
-                + data.get("answer", raw_response)
+                "decision-making without CA review.\n\n" + data.get("answer", raw_response)
             )
 
         # Validate: favorable_scenario present

@@ -12,25 +12,26 @@ from typing import Any
 from rag_pipeline.agents.base import AgentOutput, BaseAgent
 from rag_pipeline.agents.confidence import ConfidenceTier
 
-
 # Categories that are ALWAYS flagged for CA judgment per the production spec
-_ALWAYS_FLAG_CATEGORIES = frozenset({
-    "inventory_costing",
-    "lifo",
-    "leases",
-    "lease",
-    "r_and_d",
-    "r&d",
-    "development_costs",
-    "research_development",
-    "functional_currency",
-    "hyperinflation",
-    "fx_translation",
-    "foreign_currency",
-    "expected_credit_loss",
-    "ecl",
-    "cecl",
-})
+_ALWAYS_FLAG_CATEGORIES = frozenset(
+    {
+        "inventory_costing",
+        "lifo",
+        "leases",
+        "lease",
+        "r_and_d",
+        "r&d",
+        "development_costs",
+        "research_development",
+        "functional_currency",
+        "hyperinflation",
+        "fx_translation",
+        "foreign_currency",
+        "expected_credit_loss",
+        "ecl",
+        "cecl",
+    }
+)
 
 
 class GaapTranslatorAgent(BaseAgent):
@@ -70,10 +71,7 @@ class GaapTranslatorAgent(BaseAgent):
             )
 
         if input_data:
-            parts.append(
-                "US GAAP FINANCIAL DATA (from extraction):\n"
-                f"{_format_financial_data(input_data)}"
-            )
+            parts.append(f"US GAAP FINANCIAL DATA (from extraction):\n{_format_financial_data(input_data)}")
 
         parts.append(f"TRANSLATION REQUEST:\n{query}")
         parts.append(

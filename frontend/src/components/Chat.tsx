@@ -135,23 +135,6 @@ const QUICK_ACTIONS = [
 ];
 
 // ---------------------------------------------------------------------------
-// RAG System Prompt — Strict zero-hallucination
-// ---------------------------------------------------------------------------
-
-const SYSTEM_PROMPT = `You are an elite cross-border corporate finance AI powering the Anchorium Omni-Engine.
-
-STRICT RULES:
-1. Answer the user's question using ONLY the provided context chunks below.
-2. If the math, data, or information needed is NOT in the provided context, you MUST say: "⚠️ Insufficient data provided in the uploaded documents to answer this question accurately."
-3. NEVER hallucinate, fabricate, or infer numbers that are not explicitly stated in the context.
-4. When performing calculations, show your work step-by-step.
-5. Always cite the document name of the chunk you are using for each claim (e.g., "According to sales_report.pdf, ...").
-6. Format financial figures with proper currency symbols and thousand separators.
-7. If you identify data quality issues in the context (e.g., conflicting numbers), flag them explicitly.
-
-You are operating under a zero-knowledge architecture. The user's raw documents are processed locally — you only receive the most relevant text excerpts.`;
-
-// ---------------------------------------------------------------------------
 // Cosine Similarity — Local vector matching
 // ---------------------------------------------------------------------------
 
@@ -361,7 +344,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
         ]);
 
         // Step 5: Stream from local extractive RAG synthesis engine
-        await streamFromLocalWorker(query, relevantChunks, assistantId, agentType);
+        await streamFromLocalWorker(query, relevantChunks, assistantId, agentType, endpoint);
       } catch (error) {
         setIsEmbeddingQuery(false);
         setMessages((prev) => [
@@ -388,7 +371,8 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
     query: string,
     relevantChunks: { text: string; score: number; documentName?: string }[],
     messageId: string,
-    agentType: string = "RAG"
+    agentType: string = "RAG",
+    endpoint: string = "/api/v1/query"
   ) {
     if (relevantChunks.length === 0) {
       setMessages((prev) =>
@@ -454,6 +438,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
         query,
         chunks: relevantChunks,
         agentType,
+        endpoint,
       });
     });
   }

@@ -5,43 +5,28 @@
  *
  * Two-state UI:
  *   1. UPLOAD STATE: Premium landing page (Anchorium Works aesthetic) with
- *      document upload and local embedding.
+ *      document upload and local embedding — cinematic video background.
  *   2. DASHBOARD STATE: Split-screen — The Vault (left) + Omni-Chat (right).
  *
  * Design: Inspired by the Anchorium Works brand — black + gold, serif headings,
  * dot grid patterns, institutional finance aesthetic.
+ *
+ * IMPORTANT: The background video is ALWAYS rendered and fixed behind
+ * all content. It never unmounts during state transitions.
  */
 
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import LocalEmbedder from "@/components/LocalEmbedder";
 import Chat from "@/components/Chat";
+import { FadeUp } from "@/components/FadeUp";
 
 interface EmbeddingResult {
   text: string;
   vector: number[];
   documentName?: string;
   isRegulatory?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Dot Grid Background Component — Signature Anchorium visual
-// ---------------------------------------------------------------------------
-
-function DotGrid() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      <svg width="100%" height="100%" className="opacity-[0.12]">
-        <defs>
-          <pattern id="dot-grid" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-            <circle cx="1.5" cy="1.5" r="1" fill="#d4af37" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dot-grid)" />
-      </svg>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -53,8 +38,8 @@ function NavBar({ showDashboard }: { showDashboard: boolean }) {
     <nav
       className="sticky top-0 z-50 border-b px-6 py-3"
       style={{
-        borderColor: showDashboard ? "var(--border-default)" : "rgba(212, 175, 55, 0.1)",
-        background: showDashboard ? "var(--surface-raised)" : "rgba(0, 0, 0, 0.85)",
+        borderColor: showDashboard ? "var(--border-default)" : "rgba(212, 175, 55, 0.08)",
+        background: showDashboard ? "rgba(10, 10, 10, 0.92)" : "rgba(0, 0, 0, 0.4)",
         backdropFilter: "blur(24px)",
       }}
     >
@@ -73,11 +58,11 @@ function NavBar({ showDashboard }: { showDashboard: boolean }) {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: "var(--text-primary)" }}>
+            <h1 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: "#F1E5AC" }}>
               Anchorium
               <span className="text-gradient ml-1 font-normal tracking-[0.08em]">Works</span>
             </h1>
-            <p className="text-[9px] uppercase tracking-[0.25em]" style={{ color: "var(--text-muted)" }}>
+            <p className="text-[9px] uppercase tracking-[0.25em]" style={{ color: "rgba(241, 229, 172, 0.5)" }}>
               Omni-Engine
             </p>
           </div>
@@ -90,9 +75,9 @@ function NavBar({ showDashboard }: { showDashboard: boolean }) {
               <span
                 key={item}
                 className="text-[11px] uppercase tracking-[0.2em] cursor-default transition-colors duration-200"
-                style={{ color: "var(--text-muted)" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--anchorium-gold)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+                style={{ color: "rgba(241, 229, 172, 0.45)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#D4AF37"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(241, 229, 172, 0.45)"; }}
               >
                 {item}
               </span>
@@ -120,7 +105,7 @@ function NavBar({ showDashboard }: { showDashboard: boolean }) {
             className="px-4 py-1.5 rounded text-[10px] uppercase tracking-[0.2em] font-semibold transition-all duration-200"
             style={{
               border: "1px solid rgba(212, 175, 55, 0.4)",
-              color: "var(--anchorium-gold)",
+              color: "#D4AF37",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "rgba(212, 175, 55, 0.1)";
@@ -187,9 +172,13 @@ export default function Home() {
 
   const handleToggleRegulatory = async () => {
     if (isRegulatoryLoaded) {
-      setDocuments((prev) => prev.filter((d) => d.id !== "regulatory-db"));
+      const remainingDocs = documents.filter((d) => d.id !== "regulatory-db");
+      setDocuments(remainingDocs);
       setEmbeddings((prev) => prev.filter((chunk) => !chunk.isRegulatory));
       setIsRegulatoryLoaded(false);
+      if (remainingDocs.length === 0) {
+        setShowDashboard(false);
+      }
     } else {
       setIsRegulatoryLoading(true);
       try {
@@ -225,102 +214,243 @@ export default function Home() {
     const docToRemove = documents.find((d) => d.id === docId);
     if (!docToRemove) return;
 
-    setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    const remainingDocs = documents.filter((d) => d.id !== docId);
+    setDocuments(remainingDocs);
     setEmbeddings((prev) => prev.filter((chunk) => chunk.documentName !== docToRemove.fileName));
-  };
-
-  // Automatically exit dashboard if all documents are removed
-  useEffect(() => {
-    if (showDashboard && documents.length === 0) {
+    if (remainingDocs.length === 0) {
       setShowDashboard(false);
     }
-  }, [documents, showDashboard]);
+  };
 
   return (
     <div
       className="flex flex-col flex-1 min-h-screen"
       style={{
-        background: "var(--surface-base)",
+        /* Transparent background so video shines through */
+        background: "transparent",
         transition: "opacity 400ms ease",
         opacity: transitionPhase === "fading" ? 0 : 1,
       }}
     >
+      {/* ================================================================== */}
+      {/* PERMANENT BACKGROUND VIDEO — Always rendered, never unmounted      */}
+      {/* ================================================================== */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100vh',
+          objectFit: 'cover',
+          zIndex: -2,
+        }}
+      >
+        <source
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260514_135830_bb6491d1-9b66-4aec-9722-13b4dfe3fb46.mp4"
+          type="video/mp4"
+        />
+      </video>
+
+      {/* Video Overlay — tints the video dark so text is readable */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(11, 11, 12, 0.72)',
+          zIndex: -1,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ================================================================== */}
+      {/* GOLD DOT GRID PATTERN — Subtle animated overlay for premium feel   */}
+      {/* ================================================================== */}
+      {!showDashboard && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: 'none',
+            backgroundImage: 'radial-gradient(circle, rgba(212, 175, 55, 0.12) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            maskImage: 'radial-gradient(ellipse 80% 70% at 50% 50%, black 30%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 50%, black 30%, transparent 75%)',
+          }}
+        />
+      )}
+
       <NavBar showDashboard={showDashboard} />
 
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col relative" style={{ zIndex: 1 }}>
         {!showDashboard ? (
           /* ============================================================ */
           /* UPLOAD STATE — Premium Anchorium Works landing               */
           /* ============================================================ */
-          <>
-            <section className="relative flex-1 flex flex-col items-center justify-center min-h-[85vh] overflow-hidden py-12">
-              {/* Dot grid background */}
-              <DotGrid />
 
-              {/* Radial gold glow */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{ background: "radial-gradient(ellipse at 50% 30%, rgba(212, 175, 55, 0.06) 0%, transparent 60%)" }}
-              />
+          <section
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: 'calc(100vh - 56px)',
+              padding: '0 32px',
+              textAlign: 'center',
+              position: 'relative',
+            }}
+          >
+            {/* Corner accents — like the reference image */}
+            <div className="hidden md:block" style={{ position: 'absolute', top: '32px', left: '40px' }}>
+              <FadeUp delay={0.1} duration={0.6} y={10}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '6px', height: '6px', border: '1px solid #D4AF37', transform: 'rotate(45deg)' }} />
+                  <span style={{ fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(241, 229, 172, 0.5)' }}>
+                    EST. 2026
+                  </span>
+                </div>
+              </FadeUp>
+            </div>
+            <div className="hidden md:block" style={{ position: 'absolute', top: '32px', right: '40px' }}>
+              <FadeUp delay={0.15} duration={0.6} y={10}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(241, 229, 172, 0.5)' }}>
+                    Gurugram, India
+                  </span>
+                  <div style={{ width: '6px', height: '6px', border: '1px solid #D4AF37', transform: 'rotate(45deg)' }} />
+                </div>
+              </FadeUp>
+            </div>
 
-              {/* EST. badge */}
-              <div
-                className="absolute top-8 left-8 text-[10px] tracking-[0.3em] uppercase hidden md:flex items-center gap-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <span className="w-2 h-2 border" style={{ borderColor: "var(--text-muted)" }} />
-                Est. 2026
-              </div>
+            {/* Main content — centered like reference */}
+            <div style={{ maxWidth: '860px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-              {/* Location badge */}
-              <div
-                className="absolute top-8 right-8 text-[10px] tracking-[0.3em] uppercase hidden md:flex items-center gap-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Gurugram, India
-                <span className="w-2 h-2 border" style={{ borderColor: "var(--text-muted)" }} />
-              </div>
-
-              {/* Hero text */}
-              <div className="relative z-10 text-center px-6 max-w-4xl animate-fade-in mb-10">
+              {/* Heading — Large, elegant, centered */}
+              <FadeUp delay={0.2} duration={1} y={40}>
                 <h2
-                  className="text-4xl sm:text-5xl lg:text-6xl font-light leading-[1.15] tracking-tight mb-4"
                   style={{
-                    color: "var(--text-primary)",
-                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: 'clamp(32px, 5.5vw, 72px)',
+                    fontWeight: 300,
+                    lineHeight: 1.08,
+                    letterSpacing: '-0.02em',
+                    color: '#F1E5AC',
+                    margin: 0,
+                    fontFamily: 'Georgia, "Times New Roman", serif',
                   }}
                 >
-                  Unlock your
-                  <em
-                    className="not-italic mx-3"
-                    style={{
-                      color: "var(--anchorium-gold)",
-                      fontStyle: "italic",
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                    }}
-                  >
-                    financial
-                  </em>
-                  growth
+                  The Ultimate
                 </h2>
+              </FadeUp>
 
-                <p
-                  className="text-sm sm:text-base max-w-xl mx-auto leading-relaxed animate-fade-in"
+              <FadeUp delay={0.4} duration={1} y={40}>
+                <h2
                   style={{
-                    color: "var(--text-secondary)",
-                    animationDelay: "200ms",
+                    fontSize: 'clamp(34px, 5.8vw, 78px)',
+                    fontWeight: 700,
+                    fontStyle: 'italic',
+                    lineHeight: 1.08,
+                    letterSpacing: '-0.01em',
+                    color: '#D4AF37',
+                    margin: '4px 0',
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                    textShadow: '0 4px 30px rgba(212, 175, 55, 0.25)',
                   }}
                 >
-                  Process your documents privately. Our AI runs entirely inside your browser — your data never touches our servers.
-                </p>
-              </div>
+                  Cross-Border
+                </h2>
+              </FadeUp>
 
-              {/* Upload Box integrated immediately below hero */}
-              <div className="relative z-10 w-full max-w-3xl px-6 animate-fade-in" style={{ animationDelay: "400ms" }}>
-                <LocalEmbedder onEmbeddingsComplete={handleEmbeddingsComplete} />
-              </div>
-            </section>
-          </>
+              <FadeUp delay={0.6} duration={1} y={40}>
+                <h2
+                  style={{
+                    fontSize: 'clamp(32px, 5.5vw, 72px)',
+                    fontWeight: 300,
+                    lineHeight: 1.08,
+                    letterSpacing: '-0.02em',
+                    color: '#F1E5AC',
+                    margin: 0,
+                    fontFamily: 'Georgia, "Times New Roman", serif',
+                  }}
+                >
+                  Credit Engine.
+                </h2>
+              </FadeUp>
+
+              {/* Subtext */}
+              <FadeUp delay={0.9} duration={0.8} y={20}>
+                <p
+                  style={{
+                    marginTop: '32px',
+                    fontSize: 'clamp(13px, 1.4vw, 17px)',
+                    lineHeight: 1.7,
+                    color: 'rgba(241, 229, 172, 0.7)',
+                    maxWidth: '520px',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Seamlessly move your foreign startup to India with
+                  AI‑powered compliance and smart banking.
+                </p>
+              </FadeUp>
+
+              {/* CTA Button — Bracketed style like the reference */}
+              <FadeUp delay={1.15} duration={0.8} y={20}>
+                <button
+                  onClick={() => setIsUploadModalOpen(true)}
+                  style={{
+                    marginTop: '48px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    letterSpacing: '0.18em',
+                    color: '#D4AF37',
+                    textTransform: 'uppercase',
+                    backgroundColor: 'transparent',
+                    padding: '18px 40px',
+                    border: '1px solid rgba(212, 175, 55, 0.5)',
+                    cursor: 'pointer',
+                    transition: 'all 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#D4AF37';
+                    e.currentTarget.style.color = '#0B0B0C';
+                    e.currentTarget.style.boxShadow = '0 0 40px rgba(212, 175, 55, 0.35)';
+                    e.currentTarget.style.borderColor = '#D4AF37';
+                    e.currentTarget.style.transform = 'scale(1.03)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#D4AF37';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = 'rgba(212, 175, 55, 0.5)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  [ &nbsp; ACCESS PLATFORM &nbsp; ]
+                </button>
+              </FadeUp>
+            </div>
+
+            {/* Bottom decorative line */}
+            <FadeUp delay={1.4} duration={1} y={0}>
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '40px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '60px',
+                  height: '1px',
+                  background: 'linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.4), transparent)',
+                }}
+              />
+            </FadeUp>
+          </section>
         ) : (
           /* ============================================================ */
           /* DASHBOARD STATE — Split-screen Vault + Omni-Chat             */
@@ -333,7 +463,11 @@ export default function Home() {
             {/* ------ Left Panel: The Vault ------ */}
             <div
               className="w-[30%] min-w-[280px] border-r flex flex-col overflow-hidden"
-              style={{ borderColor: "var(--border-default)" }}
+              style={{
+                borderColor: "var(--border-default)",
+                background: "rgba(10, 10, 10, 0.88)",
+                backdropFilter: "blur(20px)",
+              }}
             >
               <div className="p-5 flex-1 flex flex-col">
                 <div className="flex items-center gap-3 mb-5">
@@ -371,7 +505,7 @@ export default function Home() {
                       key={doc.id}
                       className="p-3 rounded-xl flex items-center justify-between transition-all duration-200"
                       style={{
-                        background: "var(--surface-raised)",
+                        background: "rgba(26, 26, 26, 0.8)",
                         border: "1px solid var(--border-subtle)",
                       }}
                     >
@@ -404,7 +538,7 @@ export default function Home() {
                     <div
                       key={stat.label}
                       className="flex-1 px-1.5 py-2 rounded-lg text-center"
-                      style={{ background: "var(--surface-overlay)", border: "1px solid var(--border-subtle)" }}
+                      style={{ background: "rgba(26, 26, 26, 0.6)", border: "1px solid var(--border-subtle)" }}
                     >
                       <div className="text-xs font-bold" style={{ color: "var(--anchorium-gold)" }}>
                         {stat.value}
@@ -422,7 +556,7 @@ export default function Home() {
                   disabled={isRegulatoryLoading}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 mb-3"
                   style={{
-                    background: isRegulatoryLoaded ? "var(--gradient-primary)" : "var(--surface-overlay)",
+                    background: isRegulatoryLoaded ? "var(--gradient-primary)" : "rgba(26, 26, 26, 0.6)",
                     color: isRegulatoryLoaded ? "#000" : "var(--text-primary)",
                     border: isRegulatoryLoaded ? "none" : "1px solid var(--border-subtle)",
                     boxShadow: isRegulatoryLoaded ? "0 0 16px rgba(212, 175, 55, 0.2)" : "none",
@@ -477,7 +611,7 @@ export default function Home() {
                   }}
                   className="w-full text-[11px] uppercase tracking-[0.15em] px-4 py-3 rounded-lg transition-all duration-200"
                   style={{
-                    background: "var(--surface-overlay)",
+                    background: "rgba(26, 26, 26, 0.6)",
                     color: "var(--text-muted)",
                     border: "1px solid var(--border-subtle)",
                   }}
@@ -496,7 +630,13 @@ export default function Home() {
             </div>
 
             {/* ------ Right Panel: Omni-Chat ------ */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div
+              className="flex-1 flex flex-col min-w-0"
+              style={{
+                background: "rgba(10, 10, 10, 0.85)",
+                backdropFilter: "blur(16px)",
+              }}
+            >
               <Chat
                 contextChunks={embeddings}
                 onBack={() => setShowDashboard(false)}
@@ -512,7 +652,7 @@ export default function Home() {
           <div
             className="w-full max-w-2xl rounded-2xl p-6 border shadow-2xl space-y-4 relative"
             style={{
-              background: "var(--surface-raised)",
+              background: "rgba(10, 10, 10, 0.95)",
               borderColor: "rgba(212, 175, 55, 0.3)",
               boxShadow: "0 0 40px rgba(212, 175, 55, 0.15)",
             }}
@@ -520,7 +660,7 @@ export default function Home() {
             <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: "var(--border-subtle)" }}>
               <div>
                 <h3 className="text-base font-semibold uppercase tracking-wider text-gradient">
-                  Upload Additional Document
+                  {showDashboard ? "Upload Additional Document" : "Initialize Omni-Engine"}
                 </h3>
                 <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                   Maximum 6 active documents in Vault
@@ -530,7 +670,7 @@ export default function Home() {
                 onClick={() => setIsUploadModalOpen(false)}
                 className="text-[10px] font-semibold uppercase tracking-[0.15em] px-3 py-1.5 rounded-lg transition-all duration-200 border"
                 style={{
-                  background: "var(--surface-overlay)",
+                  background: "rgba(26, 26, 26, 0.8)",
                   color: "var(--text-muted)",
                   borderColor: "var(--border-subtle)"
                 }}
@@ -565,8 +705,8 @@ export default function Home() {
       {/* Footer — only on upload page */}
       {!showDashboard && (
         <footer
-          className="border-t px-6 py-4 text-center text-[10px] uppercase tracking-[0.2em]"
-          style={{ borderColor: "var(--border-subtle)", color: "var(--text-muted)" }}
+          className="relative border-t px-6 py-4 text-center text-[10px] uppercase tracking-[0.2em]"
+          style={{ borderColor: "rgba(212, 175, 55, 0.08)", color: "rgba(241, 229, 172, 0.35)", zIndex: 1 }}
         >
           Anchorium Omni-Engine v0.1.0 — Your data stays on your device. We never store, share, or train on your financial documents.
         </footer>

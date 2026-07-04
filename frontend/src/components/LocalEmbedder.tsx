@@ -106,11 +106,9 @@ export default function LocalEmbedder({
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const [chunks, setChunks] = useState<string[]>([]);
-  const [embeddings, setEmbeddings] = useState<EmbeddingResult[]>([]);
   const [downloadProgress, setDownloadProgress] =
     useState<DownloadProgress | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [expandedChunk, setExpandedChunk] = useState<number | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -193,7 +191,6 @@ export default function LocalEmbedder({
                   ...e,
                   documentName: file.name,
                 }));
-                setEmbeddings(resultsWithMeta);
                 setDownloadProgress(null);
                 console.group(`🔒 Anchorium Local Embeddings: ${file.name}`);
                 console.log("Model: Xenova/all-MiniLM-L6-v2 (384-dim)");
@@ -233,9 +230,6 @@ export default function LocalEmbedder({
         setStatusMessage("Maximum 6 documents can be uploaded at once.");
         return;
       }
-
-      setExpandedChunk(null);
-      setEmbeddings([]);
 
       try {
         for (let i = 0; i < files.length; i++) {

@@ -103,8 +103,7 @@ class RetrievalConfig(BaseSettings):
         ge=0.0,
         le=1.0,
         description=(
-            "Alpha blend weight: Score = α·Sparse + (1-α)·Dense. "
-            "Higher alpha emphasizes keyword (BM25) matching."
+            "Alpha blend weight: Score = α·Sparse + (1-α)·Dense. Higher alpha emphasizes keyword (BM25) matching."
         ),
     )
     top_k_raw: int = Field(
@@ -117,10 +116,7 @@ class RetrievalConfig(BaseSettings):
     )
     temporal_boost_factor: float = Field(
         default=0.1,
-        description=(
-            "Recency boost multiplier per year. "
-            "Score *= (1 + factor * years_newer_than_oldest)."
-        ),
+        description=("Recency boost multiplier per year. Score *= (1 + factor * years_newer_than_oldest)."),
     )
     cohere_rerank_model: str = Field(
         default="rerank-v3.5",

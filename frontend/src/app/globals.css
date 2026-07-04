@@ -1,5 +1,7 @@
+@import url('https://db.onlinewebfonts.com/c/e66905e07608167a84e6ad52f638c3c6?family=Helvetica+Now+Var');
 @import "tailwindcss";
 
+* { font-family: 'Helvetica Now Var', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 /* ==========================================================================
    Anchorium Omni-Engine — Design System (Gold & Black Theme)
    ==========================================================================
@@ -20,9 +22,9 @@
   --anchorium-gold-light: #f4d03f;
   --anchorium-gold-dark: #b8941f;
 
-  /* Surfaces */
-  --surface-base: #000000;
-  --surface-raised: #0a0a0a;
+  /* Surfaces — transparent base so the fixed background video shows through */
+  --surface-base: transparent;
+  --surface-raised: rgba(10, 10, 10, 0.92);
   --surface-overlay: #1a1a1a;
   --surface-highlight: rgba(212, 175, 55, 0.08);
 
@@ -81,7 +83,7 @@
 }
 
 body {
-  background: var(--surface-base);
+  background: transparent;
   color: var(--text-primary);
   font-family: var(--font-sans, "Inter", system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
@@ -204,4 +206,3 @@ body {
 .gold-underline:hover::after {
   width: 100%;
 }
-

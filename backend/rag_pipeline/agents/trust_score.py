@@ -16,12 +16,12 @@ from rag_pipeline.agents.confidence import ConfidenceTier
 
 # Mandatory disclaimer — appended verbatim to every output, no exceptions
 GTS_MANDATORY_DISCLAIMER: str = (
-    'Anchorium Global Trust Score (proprietary, internal use only). This is NOT a CIBIL '
-    'score, FICO score, or output of any licensed Credit Information Company, and is not a '
-    'substitute for one. It is one input Anchorium\'s partner banks may use alongside their '
-    'own underwriting. The subject\'s actual CIBIL file, once established in India, will be '
-    'independently determined by TransUnion CIBIL, Experian, Equifax, or CRIF High Mark '
-    'based on their Indian credit history.'
+    "Anchorium Global Trust Score (proprietary, internal use only). This is NOT a CIBIL "
+    "score, FICO score, or output of any licensed Credit Information Company, and is not a "
+    "substitute for one. It is one input Anchorium's partner banks may use alongside their "
+    "own underwriting. The subject's actual CIBIL file, once established in India, will be "
+    "independently determined by TransUnion CIBIL, Experian, Equifax, or CRIF High Mark "
+    "based on their Indian credit history."
 )
 
 
@@ -57,17 +57,11 @@ class TrustScoreAgent(BaseAgent):
         if context_chunks:
             context_block = self._build_context_block(context_chunks)
             parts.append(
-                "REGULATORY CONTEXT:\n"
-                "========================\n\n"
-                f"{context_block}\n\n"
-                "========================"
+                f"REGULATORY CONTEXT:\n========================\n\n{context_block}\n\n========================"
             )
 
         if input_data:
-            parts.append(
-                "FOUNDER PROFILE DATA:\n"
-                f"{_format_profile_data(input_data)}"
-            )
+            parts.append(f"FOUNDER PROFILE DATA:\n{_format_profile_data(input_data)}")
 
         parts.append(f"TRUST SCORE REQUEST:\n{query}")
         parts.append(

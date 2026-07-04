@@ -30,12 +30,10 @@ Usage examples::
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 import structlog
 import typer
@@ -181,9 +179,7 @@ def _parse_issuing_body(value: str) -> IssuingBody:
         return IssuingBody(normalised)
     except ValueError:
         valid = ", ".join(member.value for member in IssuingBody)
-        raise typer.BadParameter(
-            f"Invalid issuing body '{value}'. Must be one of: {valid}"
-        )
+        raise typer.BadParameter(f"Invalid issuing body '{value}'. Must be one of: {valid}")
 
 
 def _display_indexing_result(result: IndexingResult) -> None:
@@ -218,25 +214,29 @@ def _display_compliance_response(response: ComplianceResponse) -> None:
         status = "[bold red]⚠ UNVERIFIED[/bold red]"
 
     console.print()
-    console.print(Panel(
-        f"[bold]Query:[/bold] {response.query}\n"
-        f"[bold]Status:[/bold] {status}\n"
-        f"[bold]Model:[/bold] {response.model_used}\n"
-        f"[bold]Attempts:[/bold] {response.generation_attempts}\n"
-        f"[bold]Context Chunks:[/bold] {response.context_chunks_used}\n"
-        f"[bold]Validation Confidence:[/bold] "
-        f"{response.validation_result.confidence_score:.1%}",
-        title="📋 Compliance Response",
-        border_style="green" if response.is_verified else "red",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Query:[/bold] {response.query}\n"
+            f"[bold]Status:[/bold] {status}\n"
+            f"[bold]Model:[/bold] {response.model_used}\n"
+            f"[bold]Attempts:[/bold] {response.generation_attempts}\n"
+            f"[bold]Context Chunks:[/bold] {response.context_chunks_used}\n"
+            f"[bold]Validation Confidence:[/bold] "
+            f"{response.validation_result.confidence_score:.1%}",
+            title="📋 Compliance Response",
+            border_style="green" if response.is_verified else "red",
+        )
+    )
 
     # Answer
     console.print()
-    console.print(Panel(
-        response.answer,
-        title="📝 Answer",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            response.answer,
+            title="📝 Answer",
+            border_style="blue",
+        )
+    )
 
     # Citations
     if response.citations:
@@ -269,11 +269,13 @@ def _display_compliance_response(response: ComplianceResponse) -> None:
     # Refusal reason
     if response.refusal_reason:
         console.print()
-        console.print(Panel(
-            response.refusal_reason,
-            title="🚫 Refusal Reason",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                response.refusal_reason,
+                title="🚫 Refusal Reason",
+                border_style="red",
+            )
+        )
 
     # Validation details
     if response.validation_result.failed_claims:
@@ -340,7 +342,7 @@ def ingest(
         "-v",
         help="Version number for this circular (used for supersession tracking).",
     ),
-    supersede_old: Optional[str] = typer.Option(
+    supersede_old: str | None = typer.Option(
         None,
         "--supersede",
         "-s",
@@ -372,17 +374,19 @@ def ingest(
 
     doc_title = title if title else file.stem.replace("_", " ").title()
 
-    console.print(Panel(
-        f"[bold]File:[/bold] {file}\n"
-        f"[bold]Issuing Body:[/bold] {parsed_body.value}\n"
-        f"[bold]Circular:[/bold] {circular_number}\n"
-        f"[bold]Effective Date:[/bold] {parsed_date.isoformat()}\n"
-        f"[bold]Title:[/bold] {doc_title}\n"
-        f"[bold]Version:[/bold] {version}"
-        + (f"\n[bold]Supersedes:[/bold] {supersede_old}" if supersede_old else ""),
-        title="📄 Ingestion Parameters",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]File:[/bold] {file}\n"
+            f"[bold]Issuing Body:[/bold] {parsed_body.value}\n"
+            f"[bold]Circular:[/bold] {circular_number}\n"
+            f"[bold]Effective Date:[/bold] {parsed_date.isoformat()}\n"
+            f"[bold]Title:[/bold] {doc_title}\n"
+            f"[bold]Version:[/bold] {version}"
+            + (f"\n[bold]Supersedes:[/bold] {supersede_old}" if supersede_old else ""),
+            title="📄 Ingestion Parameters",
+            border_style="cyan",
+        )
+    )
 
     # Step 1: Handle supersession of old circular
     if supersede_old:
@@ -431,9 +435,7 @@ def ingest(
         raise typer.Exit(code=1) from exc
 
     parse_duration = time.perf_counter() - t_start
-    console.print(
-        f"  [green]✓[/green] Parsed {len(chunks)} chunks in {parse_duration:.1f}s"
-    )
+    console.print(f"  [green]✓[/green] Parsed {len(chunks)} chunks in {parse_duration:.1f}s")
 
     if not chunks:
         console.print("[yellow]No chunks produced — the document may be empty or unparseable.[/yellow]")
@@ -471,24 +473,24 @@ def query(
         ...,
         help="The compliance question to answer.",
     ),
-    issuing_body: Optional[str] = typer.Option(
+    issuing_body: str | None = typer.Option(
         None,
         "--issuing-body",
         "-b",
         help="Filter results to a specific issuing body (RBI, SEBI, etc.).",
     ),
-    circular_number: Optional[str] = typer.Option(
+    circular_number: str | None = typer.Option(
         None,
         "--circular",
         "-c",
         help="Filter results to a specific circular number.",
     ),
-    min_date: Optional[str] = typer.Option(
+    min_date: str | None = typer.Option(
         None,
         "--min-date",
         help="Only retrieve circulars effective on or after this date (YYYY-MM-DD).",
     ),
-    max_date: Optional[str] = typer.Option(
+    max_date: str | None = typer.Option(
         None,
         "--max-date",
         help="Only retrieve circulars effective on or before this date (YYYY-MM-DD).",
@@ -542,12 +544,14 @@ def query(
         active_only=not include_inactive,
     )
 
-    console.print(Panel(
-        f"[bold]Query:[/bold] {question}\n"
-        f"[bold]Filters:[/bold] {filters.model_dump(exclude_none=True, exclude_defaults=True) or 'None'}",
-        title="🔍 Compliance Query",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Query:[/bold] {question}\n"
+            f"[bold]Filters:[/bold] {filters.model_dump(exclude_none=True, exclude_defaults=True) or 'None'}",
+            title="🔍 Compliance Query",
+            border_style="cyan",
+        )
+    )
 
     # Initialize services
     console.print("\n[cyan]Initializing services…[/cyan]")
@@ -645,7 +649,7 @@ def supersede(
         "--old-circular",
         help="The circular number to mark as superseded (inactive).",
     ),
-    new_circular: Optional[str] = typer.Option(
+    new_circular: str | None = typer.Option(
         None,
         "--new-circular",
         help="The replacing circular number (for audit logging only).",
@@ -664,13 +668,15 @@ def supersede(
     _configure_logging()
     settings = _load_settings_or_exit()
 
-    console.print(Panel(
-        f"[bold]Old Circular:[/bold] {old_circular}\n"
-        f"[bold]New Circular:[/bold] {new_circular or 'N/A'}\n"
-        f"[bold]Action:[/bold] {'DELETE' if delete else 'Mark Inactive'}",
-        title="🔄 Supersession",
-        border_style="yellow",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Old Circular:[/bold] {old_circular}\n"
+            f"[bold]New Circular:[/bold] {new_circular or 'N/A'}\n"
+            f"[bold]Action:[/bold] {'DELETE' if delete else 'Mark Inactive'}",
+            title="🔄 Supersession",
+            border_style="yellow",
+        )
+    )
 
     try:
         pinecone_indexer = PineconeIndexer(
@@ -694,18 +700,14 @@ def supersede(
         console.print(f"\n[yellow]Marking {old_circular} as inactive…[/yellow]")
         try:
             count = pinecone_indexer.supersede_document(old_circular)
-            console.print(
-                f"[green]✓ Marked {count} vectors as inactive for {old_circular}.[/green]"
-            )
+            console.print(f"[green]✓ Marked {count} vectors as inactive for {old_circular}.[/green]")
         except Exception as exc:
             console.print(f"[red]Supersession failed:[/red] {exc}")
             logger.exception("supersession_failed", circular=old_circular)
             raise typer.Exit(code=1) from exc
 
     if new_circular:
-        console.print(
-            f"\n[dim]Audit log: {old_circular} superseded by {new_circular}[/dim]"
-        )
+        console.print(f"\n[dim]Audit log: {old_circular} superseded by {new_circular}[/dim]")
 
     console.print("\n[bold green]✅ Supersession complete.[/bold green]")
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -41,7 +41,8 @@ _CLAUSE_RE = re.compile(r"^(?:\(\w+\)|Clause\s+)", re.MULTILINE)
 # Pydantic Models
 # ===================================================================
 
-class IssuingBody(str, Enum):
+
+class IssuingBody(StrEnum):
     """Enumeration of recognised regulatory / issuing bodies."""
 
     RBI = "RBI"
@@ -58,19 +59,13 @@ class DocumentMetadata(BaseModel):
     (effective date, active flag), and versioning.
     """
 
-    document_title: str = Field(
-        ..., description="Full title of the regulatory document."
-    )
-    issuing_body: IssuingBody = Field(
-        ..., description="Regulatory body that issued the document."
-    )
+    document_title: str = Field(..., description="Full title of the regulatory document.")
+    issuing_body: IssuingBody = Field(..., description="Regulatory body that issued the document.")
     circular_number: str = Field(
         ...,
         description="Official circular reference, e.g. 'RBI/2024-25/42'.",
     )
-    effective_date: date = Field(
-        ..., description="Date from which the circular is in force."
-    )
+    effective_date: date = Field(..., description="Date from which the circular is in force.")
     is_active: bool = Field(
         default=True,
         description="Whether the document is currently in force.",
@@ -79,12 +74,8 @@ class DocumentMetadata(BaseModel):
         default=1,
         description="Internal version counter for superseded circulars.",
     )
-    source_file: str = Field(
-        ..., description="Original filename or path of the ingested PDF."
-    )
-    total_pages: int = Field(
-        ..., ge=0, description="Total number of pages in the source PDF."
-    )
+    source_file: str = Field(..., description="Original filename or path of the ingested PDF.")
+    total_pages: int = Field(..., ge=0, description="Total number of pages in the source PDF.")
 
 
 class HierarchicalElement(BaseModel):
@@ -104,9 +95,7 @@ class HierarchicalElement(BaseModel):
         default="",
         description="Heading text if the element represents a heading.",
     )
-    content: str = Field(
-        ..., description="Full textual content of the element."
-    )
+    content: str = Field(..., description="Full textual content of the element.")
     page_number: int = Field(..., ge=1, description="1-indexed source page.")
     element_type: Literal["heading", "paragraph", "table", "list_item"] = Field(
         ..., description="Semantic type of the element."
@@ -117,9 +106,7 @@ class ParsedPage(BaseModel):
     """All extracted information for a single PDF page."""
 
     page_number: int = Field(..., ge=1, description="1-indexed page number.")
-    raw_text: str = Field(
-        default="", description="Concatenated raw text of the page."
-    )
+    raw_text: str = Field(default="", description="Concatenated raw text of the page.")
     tables: list[str] = Field(
         default_factory=list,
         description="Markdown-formatted table strings extracted from the page.",
@@ -137,16 +124,10 @@ class DocumentChunk(BaseModel):
     and all metadata required by the retrieval layer.
     """
 
-    chunk_id: str = Field(
-        ..., description="Deterministic SHA-256 hash identifying this chunk."
-    )
+    chunk_id: str = Field(..., description="Deterministic SHA-256 hash identifying this chunk.")
     text: str = Field(..., description="Chunk text content.")
-    token_count: int = Field(
-        ..., ge=0, description="Number of tokens in the chunk text."
-    )
-    metadata: DocumentMetadata = Field(
-        ..., description="Parent document metadata."
-    )
+    token_count: int = Field(..., ge=0, description="Number of tokens in the chunk text.")
+    metadata: DocumentMetadata = Field(..., description="Parent document metadata.")
     hierarchical_path: str = Field(
         default="",
         description="Path such as 'Chapter III > Section 6 > Clause 6.2(a)'.",
@@ -159,14 +140,13 @@ class DocumentChunk(BaseModel):
         default=False,
         description="Whether the chunk includes tabular data.",
     )
-    chunk_index: int = Field(
-        ..., ge=0, description="0-indexed position within the document."
-    )
+    chunk_index: int = Field(..., ge=0, description="0-indexed position within the document.")
 
 
 # ===================================================================
 # LayoutAwareParser
 # ===================================================================
+
 
 class LayoutAwareParser:
     """Layout-aware PDF parser with *pdfplumber* primary and *unstructured* fallback.
@@ -311,12 +291,7 @@ class LayoutAwareParser:
 
         cleaned_rows: list[list[str]] = []
         for row in table:
-            cleaned_rows.append(
-                [
-                    (cell or "").replace("\n", " ").strip()
-                    for cell in row
-                ]
-            )
+            cleaned_rows.append([(cell or "").replace("\n", " ").strip() for cell in row])
 
         if not cleaned_rows:
             return ""
@@ -434,9 +409,7 @@ class LayoutAwareParser:
     # Fallback parser
     # ------------------------------------------------------------------
 
-    def _fallback_parse_with_unstructured(
-        self, file_path: Path
-    ) -> list[ParsedPage]:
+    def _fallback_parse_with_unstructured(self, file_path: Path) -> list[ParsedPage]:
         """Parse a PDF using the *unstructured* library as a fallback.
 
         Args:
@@ -462,9 +435,7 @@ class LayoutAwareParser:
                 "fallback_parse.unstructured_not_installed",
                 hint="pip install 'unstructured[pdf]'",
             )
-            raise ImportError(
-                "unstructured is not installed — cannot fall back."
-            ) from imp_err
+            raise ImportError("unstructured is not installed — cannot fall back.") from imp_err
 
         try:
             elements = partition_pdf(
@@ -477,9 +448,7 @@ class LayoutAwareParser:
                 "fallback_parse.partition_pdf_failed",
                 error=str(part_err),
             )
-            raise RuntimeError(
-                f"unstructured partition_pdf failed: {part_err!r}"
-            ) from part_err
+            raise RuntimeError(f"unstructured partition_pdf failed: {part_err!r}") from part_err
 
         page_map: dict[int, ParsedPage] = {}
 
@@ -497,9 +466,7 @@ class LayoutAwareParser:
             text_content: str = str(elem)
 
             # Accumulate raw text
-            parsed_page.raw_text = (
-                (parsed_page.raw_text + "\n" + text_content).strip()
-            )
+            parsed_page.raw_text = (parsed_page.raw_text + "\n" + text_content).strip()
 
             category: str = getattr(elem, "category", "NarrativeText") or "NarrativeText"
 
@@ -570,6 +537,7 @@ class LayoutAwareParser:
 # LegalStructuralChunker
 # ===================================================================
 
+
 class LegalStructuralChunker:
     """Token-bounded, clause-boundary-respecting chunker for legal documents.
 
@@ -584,23 +552,17 @@ class LegalStructuralChunker:
 
     def __init__(self, config: ChunkingConfig) -> None:
         self._config = config
-        self._log: structlog.stdlib.BoundLogger = logger.bind(
-            component="LegalStructuralChunker"
-        )
+        self._log: structlog.stdlib.BoundLogger = logger.bind(component="LegalStructuralChunker")
 
         try:
-            self._encoder: tiktoken.Encoding = tiktoken.get_encoding(
-                config.tokenizer_model
-            )
+            self._encoder: tiktoken.Encoding = tiktoken.get_encoding(config.tokenizer_model)
         except Exception as enc_err:
             self._log.error(
                 "chunker_init.tokenizer_load_failed",
                 tokenizer_model=config.tokenizer_model,
                 error=str(enc_err),
             )
-            raise ValueError(
-                f"Failed to load tiktoken encoding '{config.tokenizer_model}': {enc_err!r}"
-            ) from enc_err
+            raise ValueError(f"Failed to load tiktoken encoding '{config.tokenizer_model}': {enc_err!r}") from enc_err
 
         self._log.info(
             "chunker_init.success",
@@ -665,9 +627,7 @@ class LegalStructuralChunker:
         # 6. Re-index and assign deterministic IDs.
         final_chunks: list[DocumentChunk] = []
         for idx, chunk in enumerate(merged_chunks):
-            chunk_id = self._generate_chunk_id(
-                metadata.circular_number, idx, chunk.text
-            )
+            chunk_id = self._generate_chunk_id(metadata.circular_number, idx, chunk.text)
             final_chunks.append(
                 chunk.model_copy(
                     update={
@@ -703,9 +663,7 @@ class LegalStructuralChunker:
     # Boundary detection
     # ------------------------------------------------------------------
 
-    def _detect_clause_boundaries(
-        self, elements: list[HierarchicalElement]
-    ) -> list[int]:
+    def _detect_clause_boundaries(self, elements: list[HierarchicalElement]) -> list[int]:
         """Return indices at which a new clause or section begins.
 
         An element is considered a boundary when:
@@ -860,10 +818,7 @@ class LegalStructuralChunker:
         for sentence in sentences:
             sentence_tokens = self._count_tokens(sentence)
 
-            if (
-                current_tokens + sentence_tokens > self._config.max_chunk_tokens
-                and current_sentences
-            ):
+            if current_tokens + sentence_tokens > self._config.max_chunk_tokens and current_sentences:
                 chunk_text = " ".join(current_sentences)
                 sub_chunks.append(
                     DocumentChunk(
@@ -917,9 +872,7 @@ class LegalStructuralChunker:
     # Small-chunk merging
     # ------------------------------------------------------------------
 
-    def _merge_small_chunks(
-        self, chunks: list[DocumentChunk]
-    ) -> list[DocumentChunk]:
+    def _merge_small_chunks(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         """Merge chunks smaller than *min_chunk_tokens* with a neighbour.
 
         Merge direction:
@@ -971,22 +924,16 @@ class LegalStructuralChunker:
             and self._count_tokens(merged[0].text) < self._config.min_chunk_tokens
             and merged[0].hierarchical_path == merged[1].hierarchical_path
         ):
-            combined_tokens = (
-                self._count_tokens(merged[0].text)
-                + self._count_tokens(merged[1].text)
-            )
+            combined_tokens = self._count_tokens(merged[0].text) + self._count_tokens(merged[1].text)
             if combined_tokens <= self._config.max_chunk_tokens:
                 merged_text = merged[0].text + "\n\n" + merged[1].text
-                merged_pages = sorted(
-                    set(merged[0].page_numbers + merged[1].page_numbers)
-                )
+                merged_pages = sorted(set(merged[0].page_numbers + merged[1].page_numbers))
                 merged[1] = merged[1].model_copy(
                     update={
                         "text": merged_text,
                         "token_count": self._count_tokens(merged_text),
                         "page_numbers": merged_pages,
-                        "contains_table": merged[0].contains_table
-                        or merged[1].contains_table,
+                        "contains_table": merged[0].contains_table or merged[1].contains_table,
                     }
                 )
                 merged.pop(0)
@@ -1029,9 +976,7 @@ class LegalStructuralChunker:
         if not stack:
             return ""
 
-        return " > ".join(
-            stack[k] for k in sorted(stack)
-        )
+        return " > ".join(stack[k] for k in sorted(stack))
 
     # ------------------------------------------------------------------
     # Deterministic chunk ID
@@ -1063,6 +1008,7 @@ class LegalStructuralChunker:
 # ===================================================================
 # Convenience function
 # ===================================================================
+
 
 def ingest_document(
     file_path: Path,

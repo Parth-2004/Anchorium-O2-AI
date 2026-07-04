@@ -44,6 +44,7 @@ interface GenerateMessage {
   query: string;
   chunks: RelevantChunk[];
   agentType: string;
+  endpoint?: string;
 }
 
 interface QueryAnalysis {
@@ -423,8 +424,7 @@ interface KnowledgeEntry {
 }
 
 function getExpertKnowledge(
-  intent: string,
-  _analysis: QueryAnalysis
+  intent: string
 ): KnowledgeEntry {
   const knowledgeBase: Record<string, KnowledgeEntry> = {
     loan_eligibility: {
@@ -485,7 +485,7 @@ function extractSupportingFacts(
   const seen = new Set<string>();
 
   for (const chunk of chunks.slice(0, 5)) {
-    let text = chunk.text
+    const text = chunk.text
       .replace(/[\r\n]+/g, " ")
       .replace(/\s{2,}/g, " ")
       .replace(/Updated as on [A-Za-z]+ \d{1,2}, \d{4}/gi, "")
@@ -602,7 +602,7 @@ self.addEventListener("message", async (event: MessageEvent) => {
   const data = event.data as GenerateMessage;
   if (data.type !== "generate") return;
 
-  const { messageId, query, chunks, agentType } = data;
+  const { messageId, query, chunks, agentType, endpoint: requestedEndpoint } = data;
 
   try {
     self.postMessage({
@@ -616,14 +616,12 @@ self.addEventListener("message", async (event: MessageEvent) => {
     const analysis = analyzeQuery(query);
 
     // Step 2: Determine which agent to route to
-    let resolvedAgent =
+    const resolvedAgent =
       AGENT_TYPE_MAP[agentType] ||
       INTENT_TO_AGENT[analysis.intent] ||
       "compliance_copilot";
 
-    // Override: if user explicitly selected a quick action with an endpoint
-    const endpoint =
-      AGENT_ENDPOINT[resolvedAgent] || "/api/v1/query";
+    const endpoint = requestedEndpoint || AGENT_ENDPOINT[resolvedAgent] || "/api/v1/query";
 
     // Step 3: Try backend first
     const backendSuccess = await streamFromBackend(
@@ -644,7 +642,7 @@ self.addEventListener("message", async (event: MessageEvent) => {
 
     await new Promise((r) => setTimeout(r, 200));
 
-    const knowledge = getExpertKnowledge(analysis.intent, analysis);
+    const knowledge = getExpertKnowledge(analysis.intent);
     const supportingFacts = extractSupportingFacts(chunks, analysis);
     const answer = generateOfflineResponse(
       query,

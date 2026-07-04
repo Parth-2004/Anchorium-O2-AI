@@ -12,12 +12,12 @@ one LOW item → entire report is "REQUIRES CA REVIEW BEFORE CLIENT DELIVERY".
 from __future__ import annotations
 
 from datetime import date, timedelta
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ConfidenceTier(str, Enum):
+class ConfidenceTier(StrEnum):
     """Three-tier confidence classification per Core Directives Rule 3."""
 
     HIGH = "HIGH"

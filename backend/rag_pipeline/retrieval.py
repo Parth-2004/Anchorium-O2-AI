@@ -216,12 +216,8 @@ class HybridSearchEngine:
         sparse_norm_list = self._normalize_scores(sparse_scores_raw)
         dense_norm_list = self._normalize_scores(dense_scores_raw)
 
-        sparse_norm_map: dict[str, float] = dict(
-            zip(sparse_map.keys(), sparse_norm_list, strict=True)
-        )
-        dense_norm_map: dict[str, float] = dict(
-            zip(dense_map.keys(), dense_norm_list, strict=True)
-        )
+        sparse_norm_map: dict[str, float] = dict(zip(sparse_map.keys(), sparse_norm_list, strict=True))
+        dense_norm_map: dict[str, float] = dict(zip(dense_map.keys(), dense_norm_list, strict=True))
 
         # --- Step 5: Alpha-blend over the union ---
         all_chunk_ids = set(sparse_map.keys()) | set(dense_map.keys())
@@ -274,9 +270,7 @@ class HybridSearchEngine:
             duration_s=round(duration, 4),
         )
 
-        filters_snapshot: dict[str, Any] = active_filters.model_dump(
-            exclude_none=True
-        )
+        filters_snapshot: dict[str, Any] = active_filters.model_dump(exclude_none=True)
 
         return RetrievalResult(
             query=query,
@@ -339,9 +333,7 @@ class HybridSearchEngine:
         Returns:
             The same list with ``blended_score`` values adjusted in-place.
         """
-        dated_chunks = [
-            sc for sc in chunks if sc.chunk.metadata.effective_date is not None
-        ]
+        dated_chunks = [sc for sc in chunks if sc.chunk.metadata.effective_date is not None]
 
         if not dated_chunks:
             self._log.debug("temporal_boost_skipped", reason="no_effective_dates")
@@ -396,9 +388,7 @@ class HybridSearchEngine:
             conditions.append({"is_active": {"$eq": True}})
 
         if filters.issuing_body is not None:
-            conditions.append(
-                {"issuing_body": {"$eq": filters.issuing_body.value}}
-            )
+            conditions.append({"issuing_body": {"$eq": filters.issuing_body.value}})
 
         if filters.min_effective_date is not None:
             conditions.append(
@@ -419,9 +409,7 @@ class HybridSearchEngine:
             )
 
         if filters.circular_number is not None:
-            conditions.append(
-                {"circular_number": {"$eq": filters.circular_number}}
-            )
+            conditions.append({"circular_number": {"$eq": filters.circular_number}})
 
         if not conditions:
             return {}
@@ -468,9 +456,7 @@ class HybridSearchEngine:
 
         page_numbers_raw = meta.get("page_numbers", [])
         if isinstance(page_numbers_raw, str):
-            page_numbers = [
-                int(p.strip()) for p in page_numbers_raw.split(",") if p.strip()
-            ]
+            page_numbers = [int(p.strip()) for p in page_numbers_raw.split(",") if p.strip()]
         elif isinstance(page_numbers_raw, list):
             page_numbers = [int(p) for p in page_numbers_raw]
         else:
@@ -553,15 +539,13 @@ class CohereReranker:
                 error=str(exc),
                 error_type=type(exc).__name__,
             )
-            fallback = sorted(
-                chunks, key=lambda sc: sc.blended_score, reverse=True
-            )
+            fallback = sorted(chunks, key=lambda sc: sc.blended_score, reverse=True)
             for sc in fallback:
                 sc.final_score = sc.blended_score
             return fallback[: self._config.top_k_reranked]
 
     @retry(
-        retry=retry_if_exception_type((cohere.errors.TooManyRequestsError, ConnectionError, TimeoutError)),
+        retry=retry_if_exception_type((cohere.TooManyRequestsError, ConnectionError, TimeoutError)),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         reraise=True,
@@ -581,8 +565,8 @@ class CohereReranker:
             Reranked and truncated list of ``ScoredChunk`` instances.
 
         Raises:
-            cohere.errors.TooManyRequestsError: Propagated after exhausting
-                retries so the outer ``rerank`` method can catch it.
+            cohere.TooManyRequestsError: Propagated after exhausting retries
+                so the outer ``rerank`` method can catch it.
             ConnectionError: On network-level failures.
             TimeoutError: When the API call exceeds its deadline.
         """

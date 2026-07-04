@@ -47,10 +47,7 @@ class AgentPromptRegistry:
             ValueError: If ``agent_name`` is not registered.
         """
         if agent_name not in self._valid_agents:
-            raise ValueError(
-                f"Unknown agent '{agent_name}'. "
-                f"Valid agents: {sorted(self._valid_agents)}"
-            )
+            raise ValueError(f"Unknown agent '{agent_name}'. Valid agents: {sorted(self._valid_agents)}")
 
         agent_prompt = AGENT_PROMPTS[agent_name]
         assembled = f"{CORE_DIRECTIVES}\n\n{agent_prompt}"

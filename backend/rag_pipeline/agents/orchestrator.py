@@ -13,7 +13,6 @@ itself — that is always delegated to the named specialist agent.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import structlog
@@ -131,10 +130,7 @@ class MasterOrchestrator:
 
         agent = agents.get(agent_name)
         if not agent:
-            raise ValueError(
-                f"Unknown agent '{agent_name}'. "
-                f"Valid agents: {sorted(agents.keys())}"
-            )
+            raise ValueError(f"Unknown agent '{agent_name}'. Valid agents: {sorted(agents.keys())}")
 
         self._log.info("single_agent_invoked", agent=agent_name)
         return agent.process(
@@ -165,22 +161,19 @@ class MasterOrchestrator:
         """
         self._log.info("full_pipeline_started")
         agent_outputs: dict[str, AgentOutput] = {}
-        audit_sources: list[str] = []
         ca_review_reasons: list[str] = []
 
         # Step 1: KYC Extraction
         self._log.info("pipeline_step_1_kyc")
         kyc_output = self._kyc.process(
-            query=f"Extract all structured founder and financial data from the uploaded documents. Context: {query}",
+            query=(f"Extract all structured founder and financial data from the uploaded documents. Context: {query}"),
             context_chunks=context_chunks,
         )
         agent_outputs["kyc_extractor"] = kyc_output
         extracted_data = kyc_output.structured_data.get("extracted_fields", {})
 
         if kyc_output.cross_border_data_flag:
-            ca_review_reasons.append(
-                "Cross-border data transfer flagged by KYC agent"
-            )
+            ca_review_reasons.append("Cross-border data transfer flagged by KYC agent")
 
         # Step 2: Compliance + GAAP (sequential for simplicity)
         self._log.info("pipeline_step_2_compliance")
@@ -234,14 +227,9 @@ class MasterOrchestrator:
         # Check for CA review triggers
         for name, output in agent_outputs.items():
             if output.requires_ca_review:
-                ca_review_reasons.append(
-                    f"{name}: requires CA review "
-                    f"(confidence: {output.confidence_tier.value})"
-                )
+                ca_review_reasons.append(f"{name}: requires CA review (confidence: {output.confidence_tier.value})")
             if output.confidence_tier == ConfidenceTier.LOW:
-                ca_review_reasons.append(
-                    f"{name}: LOW confidence detected"
-                )
+                ca_review_reasons.append(f"{name}: LOW confidence detected")
 
         requires_ca = overall_confidence != ConfidenceTier.HIGH or bool(ca_review_reasons)
 
@@ -249,19 +237,12 @@ class MasterOrchestrator:
         audit_trail = {
             "agents_invoked": list(agent_outputs.keys()),
             "models_used": list({o.model_used for o in agent_outputs.values()}),
-            "confidence_tiers": {
-                name: o.confidence_tier.value
-                for name, o in agent_outputs.items()
-            },
+            "confidence_tiers": {name: o.confidence_tier.value for name, o in agent_outputs.items()},
             "overall_confidence": overall_confidence.value,
             "low_confidence_items": [
-                name for name, o in agent_outputs.items()
-                if o.confidence_tier == ConfidenceTier.LOW
+                name for name, o in agent_outputs.items() if o.confidence_tier == ConfidenceTier.LOW
             ],
-            "cross_border_flags": [
-                name for name, o in agent_outputs.items()
-                if o.cross_border_data_flag
-            ],
+            "cross_border_flags": [name for name, o in agent_outputs.items() if o.cross_border_data_flag],
         }
 
         # Assemble the report
@@ -311,9 +292,7 @@ class MasterOrchestrator:
             for reason in ca_review_reasons:
                 sections.append(f"- {reason}")
 
-        sections.append(
-            f"\n**Overall Confidence:** {overall_confidence.value}"
-        )
+        sections.append(f"\n**Overall Confidence:** {overall_confidence.value}")
 
         # KYC Section
         if "kyc_extractor" in agent_outputs:
@@ -335,9 +314,7 @@ class MasterOrchestrator:
             sections.append("\n---\n## 4. Global Trust Score")
             sections.append(agent_outputs["trust_score"].answer)
             if agent_outputs["trust_score"].disclaimer:
-                sections.append(
-                    f"\n> **Disclaimer:** {agent_outputs['trust_score'].disclaimer}"
-                )
+                sections.append(f"\n> **Disclaimer:** {agent_outputs['trust_score'].disclaimer}")
 
         # Arbitrage Section
         if "arbitrage_calculator" in agent_outputs:
