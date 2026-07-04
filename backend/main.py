@@ -176,20 +176,20 @@ def _sse(payload: dict[str, Any]) -> str:
 
 
 def _get_orchestrator():
-    """Lazily initialize the MasterOrchestrator."""
-    import os
+    """Lazily initialize the MasterOrchestrator.
 
+    Uses local Ollama (llama3.2) — no external API key required.
+    """
     from pydantic import SecretStr
 
     from rag_pipeline.agents.orchestrator import MasterOrchestrator
     from rag_pipeline.config import GenerationConfig
 
-    api_key = os.environ.get("ANCHORIUM_OPENAI_API_KEY", "")
     config = GenerationConfig()
 
     return MasterOrchestrator(
         config=config,
-        api_key=SecretStr(api_key),
+        api_key=SecretStr("ollama"),  # Ollama doesn't need a real key
     )
 
 

@@ -62,7 +62,7 @@ interface QueryAnalysis {
 // ---------------------------------------------------------------------------
 
 const BACKEND_URL = "http://localhost:8000";
-const BACKEND_TIMEOUT_MS = 60000; // 60 second timeout for agent responses
+const BACKEND_TIMEOUT_MS = 300000; // 5 minute timeout for local LLM agent responses
 
 // Agent routing map — maps intent → backend agent name
 const INTENT_TO_AGENT: Record<string, string> = {

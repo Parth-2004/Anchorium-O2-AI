@@ -17,21 +17,22 @@ class APIKeysConfig(BaseSettings):
     """API key configuration for all external services.
 
     All keys are stored as SecretStr to prevent accidental logging.
+    NOTE: When using Ollama locally, these keys are not required.
     """
 
     model_config = SettingsConfigDict(env_prefix="ANCHORIUM_")
 
     openai_api_key: SecretStr = Field(
-        ...,
-        description="OpenAI API key for embeddings and LLM generation.",
+        default=SecretStr(""),
+        description="OpenAI API key (optional — not needed when using Ollama).",
     )
     pinecone_api_key: SecretStr = Field(
-        ...,
-        description="Pinecone API key for vector database operations.",
+        default=SecretStr(""),
+        description="Pinecone API key for vector database operations (optional).",
     )
     cohere_api_key: SecretStr = Field(
-        ...,
-        description="Cohere API key for reranking search results.",
+        default=SecretStr(""),
+        description="Cohere API key for reranking search results (optional).",
     )
     langsmith_api_key: SecretStr = Field(
         default=SecretStr(""),
@@ -152,19 +153,22 @@ class EmbeddingConfig(BaseSettings):
 
 
 class GenerationConfig(BaseSettings):
-    """Configuration for LLM generation and hallucination validation."""
+    """Configuration for LLM generation and hallucination validation.
+
+    Defaults are tuned for local Ollama with llama3.2.
+    """
 
     model_config = SettingsConfigDict(env_prefix="ANCHORIUM_GENERATION_")
 
     model_name: str = Field(
-        default="gpt-4o",
-        description="OpenAI model for compliance answer generation.",
+        default="llama3.2",
+        description="LLM model for generation (Ollama model name).",
     )
     temperature: float = Field(
-        default=0.0,
+        default=0.1,
         ge=0.0,
         le=2.0,
-        description="Sampling temperature. 0.0 for deterministic compliance outputs.",
+        description="Sampling temperature. Low for deterministic compliance outputs.",
     )
     max_tokens: int = Field(
         default=2048,
@@ -175,7 +179,7 @@ class GenerationConfig(BaseSettings):
         description="Maximum regeneration attempts if hallucination is detected.",
     )
     validation_model: str = Field(
-        default="gpt-4o",
+        default="llama3.2",
         description="Model used for the self-reflection hallucination check.",
     )
     context_window_limit: int = Field(

@@ -101,7 +101,7 @@ class BaseAgent(ABC):
     """Abstract base class for all Omni-Engine specialist agents.
 
     Provides:
-    - OpenAI client initialization
+    - OpenAI-compatible client initialization (pointed at Ollama)
     - Prompt registry access
     - Shared LLM calling logic with retry
     - JSON response parsing
@@ -110,12 +110,20 @@ class BaseAgent(ABC):
 
     Args:
         config: Generation configuration (model, temperature, etc.).
-        api_key: OpenAI API key.
+        api_key: API key (unused with Ollama but kept for interface compat).
     """
+
+    # Ollama exposes an OpenAI-compatible API at /v1
+    OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
     def __init__(self, config: GenerationConfig, api_key: SecretStr) -> None:
         self._config = config
-        self._client = OpenAI(api_key=api_key.get_secret_value())
+        # Connect to local Ollama instance via its OpenAI-compatible endpoint.
+        # The api_key is required by the OpenAI SDK but Ollama ignores it.
+        self._client = OpenAI(
+            base_url=self.OLLAMA_BASE_URL,
+            api_key="ollama",  # Ollama doesn't need a real key
+        )
         self._registry = AgentPromptRegistry()
         self._log = logger.bind(agent=self.agent_name)
 
@@ -157,7 +165,7 @@ class BaseAgent(ABC):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
-        """Call OpenAI with retry logic.
+        """Call LLM via Ollama's OpenAI-compatible API with retry logic.
 
         Args:
             system_prompt: Full system prompt.
@@ -168,14 +176,15 @@ class BaseAgent(ABC):
         Returns:
             Raw text content from the model's response.
         """
+        model = self._config.model_name
         self._log.info(
             "llm_call_started",
-            model=self._config.model_name,
+            model=model,
+            provider="ollama",
         )
         completion = self._client.chat.completions.create(
-            model=self._config.model_name,
+            model=model,
             temperature=temperature if temperature is not None else self._config.temperature,
-            max_tokens=max_tokens if max_tokens is not None else self._config.max_tokens,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
@@ -185,13 +194,12 @@ class BaseAgent(ABC):
         self._log.info(
             "llm_call_completed",
             response_length=len(content),
-            usage_prompt=getattr(completion.usage, "prompt_tokens", None),
-            usage_completion=getattr(completion.usage, "completion_tokens", None),
+            model=model,
         )
         return content
 
     def _parse_json_response(self, raw_response: str) -> dict[str, Any]:
-        """Parse JSON from an LLM response, handling markdown fences.
+        """Parse JSON from an LLM response, handling markdown fences and extraneous text.
 
         Args:
             raw_response: Raw text from the LLM.
@@ -201,14 +209,19 @@ class BaseAgent(ABC):
         """
         cleaned = raw_response.strip()
 
-        # Strip markdown code fences if present
-        fence_pattern = re.compile(
-            r"^```(?:json)?\s*\n?(.*?)\n?\s*```$",
-            re.DOTALL,
-        )
-        fence_match = fence_pattern.match(cleaned)
-        if fence_match:
-            cleaned = fence_match.group(1).strip()
+        # Extract the outermost JSON object if present, bypassing any leading/trailing text
+        json_match = re.search(r'(\{.*\})', cleaned, re.DOTALL)
+        if json_match:
+            cleaned = json_match.group(1).strip()
+        else:
+            # Fallback to stripping markdown code fences if no braces found
+            fence_pattern = re.compile(
+                r"^```(?:json)?\s*\n?(.*?)\n?\s*```$",
+                re.DOTALL,
+            )
+            fence_match = fence_pattern.match(cleaned)
+            if fence_match:
+                cleaned = fence_match.group(1).strip()
 
         try:
             data = json.loads(cleaned)
