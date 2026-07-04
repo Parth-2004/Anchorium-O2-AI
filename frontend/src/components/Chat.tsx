@@ -63,7 +63,8 @@ const QUICK_ACTIONS = [
       "Convert all US GAAP financial figures found in my uploaded documents into their Indian IndAS equivalents. " +
       "Show a detailed line-by-line mapping table with: (1) the original US GAAP line item, " +
       "(2) the corresponding IndAS standard reference, (3) any adjustment amounts, " +
-      "(4) the converted IndAS value. Flag any items where GAAP and IndAS treatment differs materially.",
+      "(4) the converted IndAS value. Flag any items where GAAP and IndAS treatment differs materially. " +
+      "Always flag LIFO, leases, R&D, FX translation, and ECL methodology for CA judgment.",
   },
   {
     id: "compliance",
@@ -76,7 +77,20 @@ const QUICK_ACTIONS = [
       "compliance check on the financial data in my uploaded documents. Specifically check: " +
       "(1) FDI sectoral caps and entry routes, (2) ECB (External Commercial Borrowing) limits, " +
       "(3) Pricing guidelines for share transfers, (4) Reporting requirements (FC-GPR, FC-TRS, FEMA Annual Return). " +
-      "Flag any compliance risks or required regulatory filings.",
+      "Flag any compliance risks or required regulatory filings. Distinguish automatic route vs. discretionary RBI approval.",
+  },
+  {
+    id: "trust-score",
+    icon: "🏦",
+    label: "Global Trust Score",
+    endpoint: "/api/v1/trust-score",
+    agentType: "Trust Score",
+    prompt:
+      "Compute the Anchorium Global Trust Score (GTS) based on the financial profile in my uploaded documents. " +
+      "Analyze: (1) disclosed foreign bureau data, (2) revenue/ARR stability, (3) collateral type and liquidity " +
+      "(flag public/liquid vs. private/illiquid — this is the biggest swing factor), " +
+      "(4) credit history length and cleanliness, (5) debt-to-asset ratio, (6) industry-vertical risk. " +
+      "Output the 0-1000 score with component breakdown. Do NOT label this as a CIBIL or FICO score.",
   },
   {
     id: "arbitrage",
@@ -89,21 +103,34 @@ const QUICK_ACTIONS = [
       "Compare: (1) Raising debt in USD and converting to INR, (2) Direct INR borrowing from Indian banks, " +
       "(3) ECB route with RBI-mandated spread caps. Factor in current USD/INR depreciation trends, " +
       "hedging costs (6-month forward premium), and withholding tax differentials. " +
-      "Output a ranked table of the 3 cheapest all-in cost pathways.",
+      "Output a ranked table of the 3 cheapest all-in cost pathways. " +
+      "MUST include a margin-call downside scenario for every 'borrow beats sell' result.",
+  },
+  {
+    id: "kyc-extract",
+    icon: "🔍",
+    label: "KYC Extract",
+    endpoint: "/api/v1/kyc-extract",
+    agentType: "KYC Extractor",
+    prompt:
+      "Extract all structured founder and financial data from my uploaded documents. " +
+      "Identify: founder name, country, entity type, annual revenue, capital source, " +
+      "proposed India activity, collateral type and value, and any financial statements. " +
+      "Tag every extracted field with a confidence score (HIGH/MEDIUM/LOW). " +
+      "Flag low-confidence fields for human re-entry. Flag any cross-border data transfers.",
   },
   {
     id: "playbook",
     icon: "📄",
-    label: "Soft-Landing Playbook",
-    endpoint: "/api/v1/query",
+    label: "Full Playbook",
+    endpoint: "/api/v1/playbook",
     agentType: "Strategy Agent",
     prompt:
-      "Generate a comprehensive India Soft-Landing Playbook based on my uploaded financial documents. " +
-      "Include: (1) Recommended entity structure (subsidiary vs. branch vs. LLP), " +
-      "(2) Capital infusion strategy and FDI compliance timeline, " +
-      "(3) Banking relationship setup — which banks are best for foreign-owned entities, " +
-      "(4) Tax registration checklist (PAN, TAN, GST, Professional Tax), " +
-      "(5) Key milestones with estimated timelines and costs in both USD and INR.",
+      "Generate the full India Soft-Landing Playbook by running all 5 specialist agents: " +
+      "(1) KYC extraction, (2) RBI/FEMA compliance analysis, (3) US GAAP → Ind AS translation, " +
+      "(4) Global Trust Score computation, (5) Arbitrage & cost comparison. " +
+      "Assemble the results into a comprehensive report with confidence tiers and audit trail. " +
+      "Flag any items requiring CA review.",
   },
 ];
 
@@ -197,10 +224,25 @@ const IconBook = () => (
   </svg>
 );
 
+const IconTrust = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M12 2l3 7h7l-5.5 4.5 2 7L12 16l-6.5 4.5 2-7L2 9h7l3-7z" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+  </svg>
+);
+
 const ACTION_ICONS: Record<string, React.ReactNode> = {
   "gaap-convert": <IconChart />,
   "compliance": <IconShield />,
+  "trust-score": <IconTrust />,
   "arbitrage": <IconArrows />,
+  "kyc-extract": <IconSearch />,
   "playbook": <IconBook />,
 };
 

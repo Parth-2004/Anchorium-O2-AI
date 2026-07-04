@@ -188,6 +188,62 @@ class GenerationConfig(BaseSettings):
     )
 
 
+class AgentConfig(BaseSettings):
+    """Configuration for the multi-agent Omni-Engine pipeline.
+
+    Per-agent overrides allow tuning model, temperature, and token limits
+    independently for each specialist agent.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ANCHORIUM_AGENT_")
+
+    # Per-agent model overrides (None = inherit from GenerationConfig)
+    compliance_model: str | None = Field(
+        default=None,
+        description="Model override for Agent 1 (Compliance Copilot).",
+    )
+    gaap_model: str | None = Field(
+        default=None,
+        description="Model override for Agent 2 (GAAP Translator).",
+    )
+    trust_score_model: str | None = Field(
+        default=None,
+        description="Model override for Agent 3 (Global Trust Score).",
+    )
+    arbitrage_model: str | None = Field(
+        default=None,
+        description="Model override for Agent 4 (Arbitrage Calculator).",
+    )
+    kyc_model: str | None = Field(
+        default=None,
+        description="Model override for Agent 5 (KYC Extractor).",
+    )
+
+    # Shared agent settings
+    stale_source_months: int = Field(
+        default=12,
+        ge=1,
+        description=(
+            "Number of months after which a regulatory source is considered "
+            "stale and triggers MEDIUM confidence (Core Directives Rule 3)."
+        ),
+    )
+    enable_arbitrage_code_execution: bool = Field(
+        default=False,
+        description=(
+            "Safety toggle: if True, the Arbitrage Calculator agent may "
+            "execute structured calculations via a sandboxed Python runtime. "
+            "Default False for safety."
+        ),
+    )
+    max_orchestration_agents: int = Field(
+        default=5,
+        ge=1,
+        le=5,
+        description="Maximum number of agents the orchestrator may invoke in a single pipeline run.",
+    )
+
+
 class AppSettings(BaseSettings):
     """Root application settings composing all subsystem configurations.
 
@@ -208,6 +264,7 @@ class AppSettings(BaseSettings):
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
+    agents: AgentConfig = Field(default_factory=AgentConfig)
 
     # Filesystem paths
     data_dir: Path = Field(
