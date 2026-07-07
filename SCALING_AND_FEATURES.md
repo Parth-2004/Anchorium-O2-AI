@@ -79,3 +79,21 @@ To differentiate the Omni-Engine from standard text-based chat applications, we 
 ### 3.5 Automated Pre-Filled Forms
 - **The Feature:** Going beyond just a report, the engine outputs actionable paperwork.
 - **Implementation:** Using the data extracted and the compliance path chosen, the system automatically populates the exact PDF forms required (e.g., RBI Form FC-GPR, KYC Annexures) ready for the founder to sign.
+
+## 4. Non-Breaking Architecture Guarantee
+
+All proposed enhancements are designed to be strictly additive. They will not deprecate or break the existing feature set:
+
+- **Zero-Retention Policy:** Continues to be the foundational security layer. Any new features (like interactive graphs or knowledge graphs) will still process ephemeral data in RAM.
+- **Existing Agent Endpoints:** The FastAPI routing (, , etc.) remains untouched. New agents (like the Verification Agent) plug into the Orchestrator pipeline without altering the base  model.
+- **Local Inference Support:** The capability to run fully local on Ollama will be preserved as an 'Edge' deployment tier, even if Cloud/SaaS tiers are introduced.
+- **Core Directives Enforcement:** The  will continue to automatically prepend the non-negotiable  to all new and existing agents.
+
+## 4. Non-Breaking Architecture Guarantee
+
+All proposed enhancements are designed to be strictly additive. They will not deprecate or break the existing feature set:
+
+- **Zero-Retention Policy:** Continues to be the foundational security layer. Any new features (like interactive graphs or knowledge graphs) will still process ephemeral data in RAM.
+- **Existing Agent Endpoints:** The FastAPI routing (`/api/v1/compliance`, `/api/v1/underwrite`, etc.) remains untouched. New agents (like the Verification Agent) plug into the Orchestrator pipeline without altering the base `AgentOutput` model.
+- **Local Inference Support:** The capability to run fully local on Ollama will be preserved as an 'Edge' deployment tier, even if Cloud/SaaS tiers are introduced.
+- **Core Directives Enforcement:** The `AgentPromptRegistry` will continue to automatically prepend the non-negotiable `CORE_DIRECTIVES` to all new and existing agents.
