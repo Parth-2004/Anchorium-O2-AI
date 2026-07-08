@@ -53,7 +53,24 @@ class ArbitrageCalculatorAgent(BaseAgent):
         if input_data:
             parts.append(f"INPUT DATA (from upstream agents):\n{_format_arbitrage_input(input_data)}")
 
+        # Fast-Path: Pre-calculate the arbitrage deterministically if inputs are clean
+        pre_calc = None
+        if input_data and "collateral_value_usd" in input_data and "existing_debt_usd" in input_data:
+            pre_calc = self._deterministic_arbitrage_calc(input_data)
+
         parts.append(f"ARBITRAGE ANALYSIS REQUEST:\n{query}")
+
+        if pre_calc is not None:
+            parts.append(
+                f"SYSTEM OVERRIDE: The financial math has been pre-calculated deterministically.\n"
+                f"Favorable Scenario - Total Annual Cost: {pre_calc['favorable_annual_cost']} USD. "
+                f"Net advantage vs liquidation: {pre_calc['net_advantage']}.\n"
+                f"Downside Scenario - Forced liquidation loss: {pre_calc['downside_loss']} USD "
+                f"at a margin call threshold of {pre_calc['margin_call_threshold']}% LTV.\n\n"
+                f"You MUST use these exact numbers in your structured JSON output. Focus your LLM "
+                f"capabilities entirely on formatting the qualitative narrative."
+            )
+
         parts.append(
             "Provide your analysis as a JSON object following the output "
             "format in your system instructions. CRITICAL: You MUST include "
@@ -99,6 +116,41 @@ class ArbitrageCalculatorAgent(BaseAgent):
             raw_response=raw_response,
         )
 
+
+    def _deterministic_arbitrage_calc(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Deterministically calculate the arbitrage costs to avoid LLM math hallucinations."""
+        def safe_float(val: Any, default: float) -> float:
+            if val is None: return default
+            if isinstance(val, str):
+                val = val.replace(",", "").strip()
+            try: return float(val)
+            except (ValueError, TypeError): return default
+
+        collateral_value = safe_float(data.get("collateral_value_usd"), 1_000_000)
+        loan_amount = safe_float(data.get("loan_amount_usd"), collateral_value * 0.5)
+
+        # Assume static rates for the fast path if not provided
+        borrow_rate_pa = safe_float(data.get("borrow_rate_pa"), 0.08)
+        liquidation_tax_rate = safe_float(data.get("liquidation_tax_rate"), 0.20)
+
+        # Favorable scenario (borrowing)
+        annual_interest = loan_amount * borrow_rate_pa
+
+        # Liquidation scenario
+        tax_hit = collateral_value * liquidation_tax_rate
+        net_advantage = tax_hit - annual_interest
+
+        # Downside scenario (margin call at 80% LTV)
+        margin_call_threshold = 80
+        critical_collateral_value = loan_amount / (margin_call_threshold / 100)
+        downside_loss = collateral_value - critical_collateral_value
+
+        return {
+            "favorable_annual_cost": annual_interest,
+            "net_advantage": f"{net_advantage} USD saved in year 1",
+            "downside_loss": downside_loss,
+            "margin_call_threshold": margin_call_threshold,
+        }
 
 def _format_arbitrage_input(data: dict[str, Any]) -> str:
     """Format arbitrage input data for the user message."""

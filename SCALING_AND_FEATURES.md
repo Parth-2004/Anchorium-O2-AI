@@ -88,3 +88,11 @@ All proposed enhancements are designed to be strictly additive. They will not de
 - **Existing Agent Endpoints:** The FastAPI routing (`/api/v1/compliance`, `/api/v1/underwrite`, etc.) remains untouched. New agents (like the Verification Agent) plug into the Orchestrator pipeline without altering the base `AgentOutput` model.
 - **Local Inference Support:** The capability to run fully local on Ollama will be preserved as an 'Edge' deployment tier, even if Cloud/SaaS tiers are introduced.
 - **Core Directives Enforcement:** The `AgentPromptRegistry` will continue to automatically prepend the non-negotiable `CORE_DIRECTIVES` to all new and existing agents.
+
+## 5. Logic-First Routing & LLM Minimization
+
+To maximize efficiency, speed, and determinism, the Omni-Engine will adopt a "Logic-First" routing paradigm.
+
+- **Predefined Code over LLMs:** Wherever a task can be solved deterministically using native code (e.g., mathematical formulas for the Arbitrage Calculator, weighted sum calculations for the Trust Score), it will be executed in Python. The LLM will only be invoked to format the narrative, not to perform the math.
+- **Fast-Path Routing:** If an incoming request perfectly matches a known structural template and requires no unstructured analysis, the Orchestrator will bypass the LLM entirely for intermediate steps, routing data directly between deterministic functions.
+- **LLM Advantage Rule:** LLMs will be strictly reserved for tasks where they provide an undeniable advantage: semantic understanding of unstructured PDFs, nuanced translation of GAAP concepts, and generating client-ready narratives.

@@ -63,16 +63,33 @@ class TrustScoreAgent(BaseAgent):
         if input_data:
             parts.append(f"FOUNDER PROFILE DATA:\n{_format_profile_data(input_data)}")
 
+        # Fast-Path: Pre-calculate the Trust Score deterministically if fields are present
+        pre_calculated_score = None
+        if input_data and "foreign_bureau_score" in input_data and "annual_revenue_usd" in input_data:
+            pre_calculated_score = self._deterministic_gts_calc(input_data)
+
         parts.append(f"TRUST SCORE REQUEST:\n{query}")
+
+        if pre_calculated_score is not None:
+            parts.append(
+                f"SYSTEM OVERRIDE: The Global Trust Score has been pre-calculated deterministically "
+                f"as {pre_calculated_score} / 1000. You MUST use this exact number in your output for the "
+                f"'global_trust_score' key. Focus your LLM capabilities entirely on explaining the qualitative "
+                f"breakdown based on the regulatory context."
+            )
+
         parts.append(
-            "Compute the Global Trust Score and provide your analysis as a "
-            "JSON object following the output format in your system instructions. "
+            "Provide your analysis as a JSON object following the output format in your system instructions. "
             "Remember: NEVER label any output as a CIBIL or FICO score."
         )
 
         user_message = "\n\n".join(parts)
         raw_response = self._call_llm(system_prompt, user_message)
         data = self._parse_json_response(raw_response)
+
+        # Enforce deterministic override if the LLM hallucinated the math
+        if pre_calculated_score is not None:
+            data["global_trust_score"] = pre_calculated_score
 
         # Validate the disclaimer is present — if the LLM omitted it, force it
         llm_disclaimer = data.get("disclaimer", "")
@@ -95,6 +112,67 @@ class TrustScoreAgent(BaseAgent):
             model_used=self._config.model_name,
             raw_response=raw_response,
         )
+
+    def _deterministic_gts_calc(self, data: dict[str, Any]) -> int:
+        """Deterministically calculate GTS based on the weights.
+
+        - Foreign Bureau Data: 15%
+        - Revenue/ARR Stability: 20%
+        - Collateral Type & Liquidity: 25%
+        - Credit History: 15%
+        - Debt-to-Asset: 15%
+        - Industry Risk: 10%
+        """
+        def safe_float(val: Any, default: float) -> float:
+            if val is None: return default
+            if isinstance(val, str):
+                val = val.replace(",", "").strip()
+            try: return float(val)
+            except (ValueError, TypeError): return default
+
+        score = 0.0
+
+        # 1. Foreign Bureau (normalize FICO 300-850 to 0-150)
+        fico = safe_float(data.get("foreign_bureau_score"), 600)
+        fico_norm = max(0, min(150, ((fico - 300) / 550) * 150))
+        score += fico_norm
+
+        # 2. Revenue (0-200)
+        rev = safe_float(data.get("annual_revenue_usd"), 0)
+        if rev > 1_000_000: score += 200
+        elif rev > 500_000: score += 150
+        elif rev > 100_000: score += 100
+        else: score += 50
+
+        # 3. Collateral (0-250)
+        col = str(data.get("collateral_type", "")).lower()
+        if "public" in col or "liquid" in col or "cash" in col: score += 250
+        elif "private" in col: score += 100
+        else: score += 50
+
+        # 4. History (0-150)
+        hist = int(safe_float(data.get("credit_history_years"), 0))
+        if hist >= 5: score += 150
+        elif hist >= 2: score += 100
+        else: score += 50
+
+        # 5. Debt to Asset (0-150)
+        debt = safe_float(data.get("existing_debt_usd"), 0)
+        assets = safe_float(data.get("total_assets_usd"), 1) # avoid div zero
+        if assets == 0: assets = 1
+        dti = debt / assets
+        if dti < 0.2: score += 150
+        elif dti < 0.5: score += 100
+        elif dti < 0.8: score += 50
+        else: score += 0
+
+        # 6. Industry Risk (0-100)
+        ind = str(data.get("industry_vertical", "")).lower()
+        if "saas" in ind or "tech" in ind: score += 100
+        elif "crypto" in ind: score += 20
+        else: score += 70
+
+        return int(min(1000, max(0, score)))
 
 
 def _format_profile_data(data: dict[str, Any]) -> str:
