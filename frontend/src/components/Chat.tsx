@@ -22,6 +22,16 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
+} from "recharts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +51,7 @@ interface ChatMessage {
   timestamp: Date;
   contextChunks?: { text: string; score: number; documentName?: string }[];
   agentType?: string;
+  chartData?: any;
 }
 
 interface ChatProps {
@@ -415,6 +426,12 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
               m.id === messageId ? { ...m, content: currentContent } : m
             )
           );
+        } else if (type === "stream-chart" && eventMessageId === messageId) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId ? { ...m, chartData: event.data.chartData } : m
+            )
+          );
         } else if (type === "stream-complete" && eventMessageId === messageId) {
           worker.removeEventListener("message", handler);
           resolve();
@@ -638,6 +655,50 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
                   </span>
                 )}
               </div>
+
+              {/* Chart rendering */}
+              {message.chartData && message.chartData.type === "bar" && (
+                <div className="mt-4 mb-4 p-4 rounded-xl" style={{ background: "rgba(10, 10, 10, 0.4)", border: "1px solid var(--border-subtle)" }}>
+                  <div className="text-xs font-semibold mb-4 text-center" style={{ color: "var(--anchorium-gold)" }}>
+                    {message.chartData.title || "Financial Visualization"}
+                  </div>
+                  <div className="w-full h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={message.chartData.data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          stroke="rgba(255,255,255,0.5)"
+                          fontSize={10}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="rgba(255,255,255,0.5)"
+                          fontSize={10}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(value) => `$${(value / 1000)}k`}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                          contentStyle={{
+                            background: 'rgba(10,10,10,0.9)',
+                            border: '1px solid rgba(212,175,55,0.3)',
+                            borderRadius: '8px',
+                            fontSize: '11px'
+                          }}
+                        />
+                        <Bar dataKey="Cost" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                          {message.chartData.data.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={index === 0 ? "var(--anchorium-gold)" : "rgba(212,175,55,0.3)"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
 
               {/* Context chunks used — collapsible */}
               {message.contextChunks && message.contextChunks.length > 0 && message.content && (

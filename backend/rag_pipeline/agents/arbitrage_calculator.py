@@ -67,8 +67,10 @@ class ArbitrageCalculatorAgent(BaseAgent):
                 f"Net advantage vs liquidation: {pre_calc['net_advantage']}.\n"
                 f"Downside Scenario - Forced liquidation loss: {pre_calc['downside_loss']} USD "
                 f"at a margin call threshold of {pre_calc['margin_call_threshold']}% LTV.\n\n"
-                f"You MUST use these exact numbers in your structured JSON output. Focus your LLM "
-                f"capabilities entirely on formatting the qualitative narrative."
+                f"You MUST use these exact numbers in your structured JSON output. Additionally, you MUST "
+                f"include the following exact 'chart_data' object at the top level of your JSON response:\n"
+                f"{_format_arbitrage_input(pre_calc['chart_data'])}\n\n"
+                f"Focus your LLM capabilities entirely on formatting the qualitative narrative."
             )
 
         parts.append(
@@ -82,6 +84,14 @@ class ArbitrageCalculatorAgent(BaseAgent):
         user_message = "\n\n".join(parts)
         raw_response = self._call_llm(system_prompt, user_message)
         data = self._parse_json_response(raw_response)
+
+        # Enforce deterministic override to prevent LLM formatting hallucinations
+        if pre_calc is not None:
+            data["chart_data"] = pre_calc["chart_data"]
+            if "favorable_scenario" not in data:
+                data["favorable_scenario"] = {}
+            data["favorable_scenario"]["total_cost_annual"] = pre_calc["favorable_annual_cost"]
+            data["favorable_scenario"]["net_advantage_vs_liquidation"] = pre_calc["net_advantage"]
 
         # Validate: downside_scenario MUST be present
         has_downside = bool(data.get("downside_scenario"))
@@ -145,11 +155,22 @@ class ArbitrageCalculatorAgent(BaseAgent):
         critical_collateral_value = loan_amount / (margin_call_threshold / 100)
         downside_loss = collateral_value - critical_collateral_value
 
+        # Generate chart data for the UI
+        chart_data = {
+            "type": "bar",
+            "title": "Cost Comparison: Borrowing vs. Liquidation (Year 1)",
+            "data": [
+                {"name": "Borrowing (Interest)", "Cost": annual_interest},
+                {"name": "Liquidation (Tax Hit)", "Cost": tax_hit}
+            ]
+        }
+
         return {
             "favorable_annual_cost": annual_interest,
             "net_advantage": f"{net_advantage} USD saved in year 1",
             "downside_loss": downside_loss,
             "margin_call_threshold": margin_call_threshold,
+            "chart_data": chart_data
         }
 
 def _format_arbitrage_input(data: dict[str, Any]) -> str:

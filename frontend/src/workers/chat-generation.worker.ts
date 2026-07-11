@@ -322,6 +322,16 @@ async function streamFromBackend(
               }
               break;
 
+            case "structured":
+              if (event.data && event.data.chart_data) {
+                self.postMessage({
+                  type: "stream-chart",
+                  messageId,
+                  chartData: event.data.chart_data,
+                });
+              }
+              break;
+
             case "confidence":
               // Send confidence tier as a styled badge
               const tierColors: Record<string, string> = {
