@@ -65,10 +65,10 @@ const OLLAMA_MODEL = "llama3.2";
 const HEADING_WORDS = "OMNI ENGINE: CROSS-BORDER CREDIT ARBITRAGE, SOLVED.".split(" ");
 
 const QUICK_ACTIONS = [
-  { label: "Convert US GAAP to IndAS", icon: "⚡" },
-  { label: "Run FEMA Check", icon: "⚖️" },
-  { label: "Analyze SBLC Terms", icon: "🏛️" },
-  { label: "Draft Compliance Report", icon: "📋" },
+  { label: "Convert US GAAP to IndAS", icon: "Zap" },
+  { label: "Run FEMA Check", icon: "Scale" },
+  { label: "Analyze SBLC Terms", icon: "Building" },
+  { label: "Draft Compliance Report", icon: "Clipboard" },
 ];
 
 const SYSTEM_PROMPT = `You are Omni Engine — an elite AI compliance and financial structuring copilot built by Anchorium Works.
@@ -236,7 +236,7 @@ export default function O2Engine() {
         const errorMessage =
           err instanceof Error && err.name === "AbortError"
             ? "Response cancelled."
-            : "⚠️ Could not connect to Ollama. Make sure `ollama serve` is running and the `llama3.2` model is pulled.\n\n```\nollama pull llama3.2\nollama serve\n```";
+            : "Could not connect to Ollama. Make sure `ollama serve` is running and the `llama3.2` model is pulled.\n\n```\nollama pull llama3.2\nollama serve\n```";
 
         setMessages((prev) =>
           prev.map((m) =>

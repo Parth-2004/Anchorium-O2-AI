@@ -37,7 +37,7 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 DRAFT_BANNER = "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE."
 
 # CA review escalation banner
-CA_REVIEW_BANNER = "⚠️ REQUIRES CA REVIEW BEFORE CLIENT DELIVERY"
+CA_REVIEW_BANNER = "REQUIRES CA REVIEW BEFORE CLIENT DELIVERY"
 
 
 class OrchestratorResult:
@@ -363,7 +363,7 @@ class MasterOrchestrator:
             sections.append(agent_outputs["verification_agent"].answer)
             unverified_claims = agent_outputs["verification_agent"].structured_data.get("unverified_claims", [])
             if unverified_claims:
-                sections.append("\n**⚠️ UNVERIFIED CLAIMS DETECTED:**")
+                sections.append("\n**UNVERIFIED CLAIMS DETECTED:**")
                 for claim in unverified_claims:
                     sections.append(f"- **Claim:** {claim.get('claim')}\n  - **Severity:** {claim.get('severity')}\n  - **Reason:** {claim.get('reason')}")
 

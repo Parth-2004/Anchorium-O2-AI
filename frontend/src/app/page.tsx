@@ -511,7 +511,7 @@ export default function Home() {
                     >
                       <div className="truncate flex-1 pr-2">
                         <div className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                          📄 {doc.fileName}
+                          {doc.fileName}
                         </div>
                         <div className="text-[10px] opacity-75" style={{ color: "var(--text-muted)" }}>
                           {doc.chunksCount} chunks
@@ -522,7 +522,7 @@ export default function Home() {
                         className="text-xs p-1 opacity-60 hover:opacity-100 hover:text-red-400 transition-all duration-150"
                         title="Remove document"
                       >
-                        🗑️
+                        [Delete]
                       </button>
                     </div>
                   ))}

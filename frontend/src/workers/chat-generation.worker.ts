@@ -335,11 +335,11 @@ async function streamFromBackend(
             case "confidence":
               // Send confidence tier as a styled badge
               const tierColors: Record<string, string> = {
-                HIGH: "🟢",
-                MEDIUM: "🟡",
-                LOW: "🔴",
+                HIGH: "[HIGH]",
+                MEDIUM: "[MEDIUM]",
+                LOW: "[LOW]",
               };
-              const badge = tierColors[event.tier] || "⚪";
+              const badge = tierColors[event.tier] || "[-]";
               self.postMessage({
                 type: "stream-chunk",
                 messageId,
@@ -349,7 +349,7 @@ async function streamFromBackend(
                 self.postMessage({
                   type: "stream-chunk",
                   messageId,
-                  text: ` | ⚠️ **Requires CA Review**`,
+                  text: ` | **Requires CA Review**`,
                 });
               }
               self.postMessage({
@@ -375,7 +375,7 @@ async function streamFromBackend(
               self.postMessage({
                 type: "stream-chunk",
                 messageId,
-                text: `\n\n> ⚠️ ${event.text}\n`,
+                text: `\n\n> ${event.text}\n`,
               });
               break;
 
@@ -384,7 +384,7 @@ async function streamFromBackend(
               self.postMessage({
                 type: "stream-chunk",
                 messageId,
-                text: `\n\n<details><summary>📋 Audit Trail</summary>\n\n\`\`\`json\n${JSON.stringify(event.data, null, 2)}\n\`\`\`\n</details>\n`,
+                text: `\n\n<details><summary>Audit Trail</summary>\n\n\`\`\`json\n${JSON.stringify(event.data, null, 2)}\n\`\`\`\n</details>\n`,
               });
               break;
 
@@ -395,7 +395,7 @@ async function streamFromBackend(
               self.postMessage({
                 type: "stream-chunk",
                 messageId,
-                text: `\n\n❌ **Error:** ${event.message}\n`,
+                text: `\n\n**Error:** ${event.message}\n`,
               });
               break;
           }
@@ -556,7 +556,7 @@ function generateOfflineResponse(
 
   // Draft banner — mandatory per Core Directives
   response +=
-    "> ⚠️ **DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.**\n\n";
+    "> **DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.**\n\n";
   response += "> *Offline mode — for grounded, source-cited analysis, ensure the backend is running.*\n\n";
 
   // Opening
@@ -580,7 +580,7 @@ function generateOfflineResponse(
   // Supporting evidence
   if (supportingFacts.length > 0) {
     response += `---\n\n`;
-    response += `📄 **From your uploaded documents:**\n\n`;
+    response += `**From your uploaded documents:**\n\n`;
     for (const fact of supportingFacts) {
       const simplified = fact
         .replace(/Authorised Dealer Category[- ]I banks?/gi, "authorized banks")
@@ -595,11 +595,11 @@ function generateOfflineResponse(
   // Important note
   if (knowledge.importantNote) {
     response += `---\n\n`;
-    response += `⚡ **Pro Tip:** ${knowledge.importantNote}\n`;
+    response += `**Pro Tip:** ${knowledge.importantNote}\n`;
   }
 
   // Confidence badge (offline = always MEDIUM)
-  response += `\n\n---\n\n🟡 **Confidence:** MEDIUM (offline mode — no RAG grounding)\n`;
+  response += `\n\n---\n\n**Confidence:** MEDIUM (offline mode — no RAG grounding)\n`;
 
   return response;
 }

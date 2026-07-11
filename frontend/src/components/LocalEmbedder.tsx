@@ -192,7 +192,7 @@ export default function LocalEmbedder({
                   documentName: file.name,
                 }));
                 setDownloadProgress(null);
-                console.group(`🔒 Anchorium Local Embeddings: ${file.name}`);
+                console.group(`Anchorium Local Embeddings: ${file.name}`);
                 console.log("Model: Xenova/all-MiniLM-L6-v2 (384-dim)");
                 console.log("Processing: 100% in-browser — zero data exfiltration");
                 console.groupEnd();
@@ -479,7 +479,7 @@ export default function LocalEmbedder({
                 className="text-xs font-mono px-2 py-1 rounded"
                 style={{ background: "var(--surface-overlay)", color: "var(--text-muted)" }}
               >
-                📄 {fileName}
+                {fileName}
               </span>
               {chunks.length > 0 && (
                 <span

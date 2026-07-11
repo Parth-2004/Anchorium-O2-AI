@@ -66,7 +66,7 @@ interface ChatProps {
 const QUICK_ACTIONS = [
   {
     id: "gaap-convert",
-    icon: "⚡",
+    icon: "Zap",
     label: "US GAAP → IndAS",
     endpoint: "/api/v1/underwrite",
     agentType: "Underwriter",
@@ -79,7 +79,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "compliance",
-    icon: "⚖️",
+    icon: "Scale",
     label: "RBI & FEMA Check",
     endpoint: "/api/v1/compliance",
     agentType: "Compliance Copilot",
@@ -92,7 +92,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "trust-score",
-    icon: "🏦",
+    icon: "Bank",
     label: "Global Trust Score",
     endpoint: "/api/v1/trust-score",
     agentType: "Trust Score",
@@ -105,7 +105,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "arbitrage",
-    icon: "🧮",
+    icon: "Abacus",
     label: "USD-INR Arbitrage",
     endpoint: "/api/v1/arbitrage",
     agentType: "Arbitrage Calculator",
@@ -119,7 +119,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "kyc-extract",
-    icon: "🔍",
+    icon: "Search",
     label: "KYC Extract",
     endpoint: "/api/v1/kyc-extract",
     agentType: "KYC Extractor",
@@ -132,7 +132,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: "playbook",
-    icon: "📄",
+    icon: "Page",
     label: "Full Playbook",
     endpoint: "/api/v1/playbook",
     agentType: "Strategy Agent",
@@ -363,7 +363,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
           {
             id: `error-${Date.now()}`,
             role: "assistant",
-            content: `⚠️ Error: ${error instanceof Error ? error.message : String(error)}`,
+            content: `Error: ${error instanceof Error ? error.message : String(error)}`,
             timestamp: new Date(),
           },
         ]);
@@ -388,7 +388,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
     if (relevantChunks.length === 0) {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === messageId ? { ...m, content: "⚠️ Insufficient data provided in the uploaded documents to answer this question accurately. Please upload documents containing relevant financial information." } : m
+          m.id === messageId ? { ...m, content: "Insufficient data provided in the uploaded documents to answer this question accurately. Please upload documents containing relevant financial information." } : m
         )
       );
       return;
@@ -439,7 +439,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
           worker.removeEventListener("message", handler);
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === messageId ? { ...m, content: `⚠️ Synthesis Error: ${message}` } : m
+              m.id === messageId ? { ...m, content: `Synthesis Error: ${message}` } : m
             )
           );
           reject(new Error(message));
@@ -720,7 +720,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
                         style={{ background: "var(--surface-overlay)", color: "var(--text-muted)" }}
                       >
                         <div className="flex justify-between font-semibold text-[10px] mb-1 opacity-80" style={{ color: "var(--anchorium-gold)" }}>
-                          <span>📄 {chunk.documentName || "Unknown Source"}</span>
+                          <span>{chunk.documentName || "Unknown Source"}</span>
                           <span className="font-mono">{(chunk.score * 100).toFixed(0)}% match</span>
                         </div>
                         <p className="leading-relaxed">
@@ -862,7 +862,7 @@ export default function Chat({ contextChunks, onBack }: ChatProps) {
         </div>
 
         <p className="text-center text-[10px] mt-2.5 tracking-wide" style={{ color: "var(--text-muted)" }}>
-          🔒 Query embedded locally • Only relevant chunks sent to backend • Zero data retention
+          Query embedded locally • Only relevant chunks sent to backend • Zero data retention
         </p>
       </div>
     </div>
