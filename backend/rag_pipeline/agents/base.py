@@ -14,14 +14,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import structlog
-from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
+import torch
 from pydantic import BaseModel, Field, SecretStr
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+from transformers import pipeline
 
 from rag_pipeline.agents.confidence import ConfidenceTag, ConfidenceTier
 from rag_pipeline.config import GenerationConfig
@@ -29,15 +24,26 @@ from rag_pipeline.prompts.registry import AgentPromptRegistry
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-# Retry decorator for OpenAI calls (shared across all agents)
-_OPENAI_RETRY = retry(
-    retry=retry_if_exception_type(
-        (APIConnectionError, APITimeoutError, RateLimitError),
-    ),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(3),
-    reraise=True,
-)
+# Singleton for Hugging Face Pipeline
+_hf_pipelines = {}
+
+def _get_hf_pipeline(model_name: str, device: str):
+    global _hf_pipelines
+    if model_name not in _hf_pipelines:
+        logger.info("loading_hf_pipeline", model=model_name, device=device)
+        try:
+            _hf_pipelines[model_name] = pipeline(
+                "text-generation",
+                model=model_name,
+                device=0 if device == "cuda" and torch.cuda.is_available() else device,
+                torch_dtype=torch.float16 if device == "cuda" and torch.cuda.is_available() else torch.float32,
+                trust_remote_code=True,
+            )
+            logger.info("hf_pipeline_loaded")
+        except Exception as e:
+            logger.error("hf_pipeline_load_failed", error=str(e))
+            raise
+    return _hf_pipelines[model_name]
 
 
 class AgentOutput(BaseModel):
@@ -95,6 +101,10 @@ class AgentOutput(BaseModel):
         default="",
         description="Raw LLM response (for audit trail).",
     )
+    flaws: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Identified red flags/flaws and remediation steps.",
+    )
 
 
 class BaseAgent(ABC):
@@ -113,17 +123,8 @@ class BaseAgent(ABC):
         api_key: API key (unused with Ollama but kept for interface compat).
     """
 
-    # Ollama exposes an OpenAI-compatible API at /v1
-    OLLAMA_BASE_URL = "http://localhost:11434/v1"
-
     def __init__(self, config: GenerationConfig, api_key: SecretStr) -> None:
         self._config = config
-        # Connect to local Ollama instance via its OpenAI-compatible endpoint.
-        # The api_key is required by the OpenAI SDK but Ollama ignores it.
-        self._client = OpenAI(
-            base_url=self.OLLAMA_BASE_URL,
-            api_key="ollama",  # Ollama doesn't need a real key
-        )
         self._registry = AgentPromptRegistry()
         self._log = logger.bind(agent=self.agent_name)
 
@@ -156,7 +157,6 @@ class BaseAgent(ABC):
         """Get the full system prompt (Core Directives + agent-specific)."""
         return self._registry.get_system_prompt(self.agent_name)
 
-    @_OPENAI_RETRY
     def _call_llm(
         self,
         system_prompt: str,
@@ -166,7 +166,7 @@ class BaseAgent(ABC):
         max_tokens: int | None = None,
         model_override: str | None = None,
     ) -> str:
-        """Call LLM via Ollama's OpenAI-compatible API with retry logic.
+        """Call LLM via Hugging Face transformers.
 
         Args:
             system_prompt: Full system prompt.
@@ -178,24 +178,47 @@ class BaseAgent(ABC):
         Returns:
             Raw text content from the model's response.
         """
-        model = model_override if model_override else self._config.model_name
+        model = model_override if model_override else self._config.hf_model_name
         self._log.info(
             "llm_call_started",
             model=model,
-            provider="ollama",
+            provider="huggingface",
         )
+
+        hf_pipeline = _get_hf_pipeline(model, self._config.hf_device)
+
+        if isinstance(user_message, list):
+            # Convert simple vision representation back to text if unsupported, or handle appropriately
+            user_message_text = " ".join([m.get("text", "") for m in user_message if not m.get("is_image")])
+        else:
+            user_message_text = user_message
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
+            {"role": "user", "content": user_message_text},
         ]
 
-        completion = self._client.chat.completions.create(
-            model=model,
+        # Use apply_chat_template if tokenizer supports it
+        try:
+            prompt = hf_pipeline.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        except Exception:
+            # Fallback if chat template is not supported
+            prompt = f"System: {system_prompt}\nUser: {user_message_text}\nAssistant:"
+
+        response = hf_pipeline(
+            prompt,
+            max_new_tokens=max_tokens if max_tokens is not None else self._config.max_tokens,
             temperature=temperature if temperature is not None else self._config.temperature,
-            messages=messages,
+            do_sample=True if (temperature or self._config.temperature) > 0 else False,
+            return_full_text=False
         )
-        content = completion.choices[0].message.content or ""
+
+        content = response[0]["generated_text"]
+
         self._log.info(
             "llm_call_completed",
             response_length=len(content),

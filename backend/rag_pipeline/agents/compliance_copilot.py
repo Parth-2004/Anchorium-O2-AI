@@ -88,7 +88,8 @@ class ComplianceCopilotAgent(BaseAgent):
             structured_data=data,
             confidence_tier=overall,
             requires_ca_review=overall != ConfidenceTier.HIGH or bool(data.get("open_questions_for_ca_review")),
-            model_used=self._config.model_name,
+            flaws=data.get('flaws', []),
+            model_used=self._config.hf_model_name,
             raw_response=raw_response,
         )
 

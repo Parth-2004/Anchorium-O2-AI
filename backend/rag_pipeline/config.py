@@ -155,14 +155,18 @@ class EmbeddingConfig(BaseSettings):
 class GenerationConfig(BaseSettings):
     """Configuration for LLM generation and hallucination validation.
 
-    Defaults are tuned for local Ollama with llama3.2.
+    Defaults are tuned for Hugging Face Transformers.
     """
 
     model_config = SettingsConfigDict(env_prefix="ANCHORIUM_GENERATION_")
 
-    model_name: str = Field(
-        default="llama3.2",
-        description="LLM model for generation (Ollama model name).",
+    hf_model_name: str = Field(
+        default="Qwen/Qwen2.5-0.5B-Instruct",
+        description="Hugging Face model for generation.",
+    )
+    hf_device: str = Field(
+        default="cpu",
+        description="Device to run Hugging Face model on ('cpu', 'cuda', 'mps').",
     )
     temperature: float = Field(
         default=0.1,
@@ -179,7 +183,7 @@ class GenerationConfig(BaseSettings):
         description="Maximum regeneration attempts if hallucination is detected.",
     )
     validation_model: str = Field(
-        default="llama3.2",
+        default="Qwen/Qwen2.5-0.5B-Instruct",
         description="Model used for the self-reflection hallucination check.",
     )
     context_window_limit: int = Field(
