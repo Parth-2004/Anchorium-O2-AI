@@ -100,14 +100,19 @@ app.add_middleware(
 # Pydantic Models for API
 # ---------------------------------------------------------------------------
 class EmbeddedChunk(BaseModel):
-    """A chunk of text with its embedding vector and metadata"""
+    """A chunk of text or image with its embedding vector and metadata"""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    text: str
+    text: str | None = None
     vector: list[float] = Field(default_factory=list)
     document_name: str | None = Field(default=None, alias="documentName")
     score: float | None = None
+
+    # Vision support
+    is_image: bool = Field(default=False, alias="isImage")
+    base64_data: str | None = Field(default=None, alias="base64Data")
+    mime_type: str | None = Field(default="image/png", alias="mimeType")
 
 
 class QueryRequest(BaseModel):
@@ -159,15 +164,24 @@ class TrustScoreRequest(BaseModel):
 
 def _chunks_to_dicts(chunks: list[EmbeddedChunk]) -> list[dict[str, Any]]:
     """Convert Pydantic EmbeddedChunk models to plain dicts for agents."""
-    return [
-        {
-            "text": c.text,
-            "documentName": c.document_name or "Unknown",
-            "score": c.score or 0.0,
-        }
-        for c in chunks
-        if c.text.strip()
-    ]
+    result = []
+    for c in chunks:
+        if c.is_image and c.base64_data:
+            result.append({
+                "is_image": True,
+                "base64_data": c.base64_data,
+                "mime_type": c.mime_type,
+                "documentName": c.document_name or "Unknown Image",
+                "score": c.score or 0.0,
+            })
+        elif c.text and c.text.strip():
+            result.append({
+                "is_image": False,
+                "text": c.text,
+                "documentName": c.document_name or "Unknown Document",
+                "score": c.score or 0.0,
+            })
+    return result
 
 
 def _sse(payload: dict[str, Any]) -> str:

@@ -40,16 +40,36 @@ class KycExtractorAgent(BaseAgent):
         """
         system_prompt = self._get_system_prompt()
 
-        parts: list[str] = []
+        text_parts: list[str] = []
+        image_contents: list[dict[str, Any]] = []
+        has_vision = False
 
         if context_chunks:
-            context_block = self._build_context_block(context_chunks)
-            parts.append(
-                f"UPLOADED DOCUMENT CONTENT:\n========================\n\n{context_block}\n\n========================"
-            )
+            # Separate text chunks from image chunks
+            text_chunks = [c for c in context_chunks if isinstance(c, dict) and not c.get("is_image")]
+            image_chunks = [c for c in context_chunks if isinstance(c, dict) and c.get("is_image")]
 
-        parts.append(f"EXTRACTION REQUEST:\n{query}")
-        parts.append(
+            if text_chunks:
+                context_block = self._build_context_block(text_chunks)
+                text_parts.append(
+                    f"UPLOADED TEXT CONTENT:\n========================\n\n{context_block}\n\n========================"
+                )
+
+            if image_chunks:
+                has_vision = True
+                text_parts.append(f"UPLOADED IMAGES:\nI have attached {len(image_chunks)} images of documents. Please carefully analyze them using your vision capabilities.")
+                for img in image_chunks:
+                    b64 = img.get("base64_data", "")
+                    mime = img.get("mime_type", "image/png")
+                    image_contents.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime};base64,{b64}"
+                        }
+                    })
+
+        text_parts.append(f"EXTRACTION REQUEST:\n{query}")
+        text_parts.append(
             "Extract structured data from the document content above. "
             "Provide your output as a JSON object following the format "
             "in your system instructions. Tag every extracted field with "
@@ -58,8 +78,18 @@ class KycExtractorAgent(BaseAgent):
             "prepare clean data only."
         )
 
-        user_message = "\n\n".join(parts)
-        raw_response = self._call_llm(system_prompt, user_message)
+        user_message_text = "\n\n".join(text_parts)
+
+        # If there are images, format as a multimodal message array, else just a string
+        if has_vision:
+            user_message = [{"type": "text", "text": user_message_text}] + image_contents
+            # Switch to llama3.2-vision if local, or whatever vision model is configured
+            model_override = "llama3.2-vision"
+        else:
+            user_message = user_message_text
+            model_override = None
+
+        raw_response = self._call_llm(system_prompt, user_message, model_override=model_override)
         data = self._parse_json_response(raw_response)
 
         # Check cross-border data flag

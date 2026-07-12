@@ -160,35 +160,40 @@ class BaseAgent(ABC):
     def _call_llm(
         self,
         system_prompt: str,
-        user_message: str,
+        user_message: str | list[dict[str, Any]],
         *,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        model_override: str | None = None,
     ) -> str:
         """Call LLM via Ollama's OpenAI-compatible API with retry logic.
 
         Args:
             system_prompt: Full system prompt.
-            user_message: User message.
+            user_message: User message (string or list of content dicts for multimodal).
             temperature: Override temperature (uses config default if None).
             max_tokens: Override max tokens (uses config default if None).
+            model_override: Override the model used for this specific call.
 
         Returns:
             Raw text content from the model's response.
         """
-        model = self._config.model_name
+        model = model_override if model_override else self._config.model_name
         self._log.info(
             "llm_call_started",
             model=model,
             provider="ollama",
         )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+
         completion = self._client.chat.completions.create(
             model=model,
             temperature=temperature if temperature is not None else self._config.temperature,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
+            messages=messages,
         )
         content = completion.choices[0].message.content or ""
         self._log.info(

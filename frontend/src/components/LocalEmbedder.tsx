@@ -126,11 +126,12 @@ export default function LocalEmbedder({
   const embedSingleFile = useCallback(
     (file: File, fileIndex: number, totalFiles: number): Promise<EmbeddingResult[]> => {
       return new Promise(async (resolve, reject) => {
-        const isText = file.name.endsWith(".txt");
+        const isText = file.name.endsWith(".txt") || file.name.endsWith(".csv");
         const isPdf = file.name.endsWith(".pdf");
+        const isImage = file.type.startsWith("image/");
 
-        if (!isText && !isPdf) {
-          reject(new Error("Please upload a .txt or .pdf file."));
+        if (!isText && !isPdf && !isImage) {
+          reject(new Error("Please upload a .txt, .pdf, or image file."));
           return;
         }
 
@@ -139,6 +140,28 @@ export default function LocalEmbedder({
         setStatusMessage(`[${fileIndex}/${totalFiles}] Reading ${file.name}...`);
 
         try {
+          if (isImage) {
+            setStatusMessage(`[${fileIndex}/${totalFiles}] Parsing Image: ${file.name}...`);
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              // Strip the data URL prefix (e.g., "data:image/png;base64,")
+              const base64 = result.split(",")[1];
+              resolve([{
+                text: "",
+                vector: new Array(384).fill(0), // Dummy vector
+                documentName: file.name,
+                isRegulatory: false,
+                isImage: true,
+                base64Data: base64,
+                mimeType: file.type
+              }]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+            return;
+          }
+
           let text: string;
           if (isPdf) {
             setStatusMessage(`[${fileIndex}/${totalFiles}] Parsing PDF: ${file.name}...`);
@@ -363,8 +386,9 @@ export default function LocalEmbedder({
             Drop your document here
           </h3>
           <p style={{ color: "var(--text-secondary)" }} className="text-sm">
-            Supports <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-overlay)" }}>.txt</span> and{" "}
-            <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-overlay)" }}>.pdf</span> files
+            Supports <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-overlay)" }}>.txt</span>,{" "}
+            <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-overlay)" }}>.pdf</span>, and{" "}
+            <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-overlay)" }}>images</span>
             — all processing happens locally in your browser
           </p>
 
