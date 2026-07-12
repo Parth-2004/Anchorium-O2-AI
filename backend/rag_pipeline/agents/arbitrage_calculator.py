@@ -121,8 +121,9 @@ class ArbitrageCalculatorAgent(BaseAgent):
             answer=data.get("answer", raw_response),
             structured_data=data,
             confidence_tier=overall,
-            requires_ca_review=True,  # Arbitrage always needs review
-            model_used=self._config.model_name,
+            requires_ca_review=True,
+            flaws=data.get('flaws', []),  # Arbitrage always needs review
+            model_used=self._config.hf_model_name,
             raw_response=raw_response,
         )
 
@@ -130,11 +131,14 @@ class ArbitrageCalculatorAgent(BaseAgent):
     def _deterministic_arbitrage_calc(self, data: dict[str, Any]) -> dict[str, Any]:
         """Deterministically calculate the arbitrage costs to avoid LLM math hallucinations."""
         def safe_float(val: Any, default: float) -> float:
-            if val is None: return default
+            if val is None:
+                return default
             if isinstance(val, str):
                 val = val.replace(",", "").strip()
-            try: return float(val)
-            except (ValueError, TypeError): return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
 
         collateral_value = safe_float(data.get("collateral_value_usd"), 1_000_000)
         loan_amount = safe_float(data.get("loan_amount_usd"), collateral_value * 0.5)

@@ -203,7 +203,7 @@ def _get_orchestrator():
 
     return MasterOrchestrator(
         config=config,
-        api_key=SecretStr("ollama"),  # Ollama doesn't need a real key
+        api_key=SecretStr(""),
     )
 
 
@@ -242,6 +242,10 @@ async def _stream_agent_response(
         # Stream structured data
         if output.structured_data:
             yield _sse({"type": "structured", "data": output.structured_data})
+
+        # Stream flaws
+        if output.flaws:
+            yield _sse({"type": "flaws", "flaws": output.flaws})
 
         # Stream confidence tier
         yield _sse(

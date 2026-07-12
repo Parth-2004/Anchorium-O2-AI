@@ -65,6 +65,7 @@ class VerificationAgent(BaseAgent):
             structured_data=data,
             confidence_tier=confidence_tier,
             requires_ca_review=requires_ca_review,
-            model_used=self._config.model_name,
+            flaws=data.get('flaws', []),
+            model_used=self._config.hf_model_name,
             raw_response=raw_response,
         )

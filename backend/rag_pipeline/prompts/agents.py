@@ -37,6 +37,7 @@ PROCESS
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "recommended_structures": [
     {
@@ -98,6 +99,7 @@ PROCESS
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "mapping_table": [
     {
@@ -175,6 +177,7 @@ based on their Indian credit history."
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "global_trust_score": 0-1000,
   "component_breakdown": {
@@ -219,6 +222,7 @@ HARD RULES
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "favorable_scenario": {
     "strategy": "...",
@@ -269,6 +273,7 @@ RULES
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "extracted_fields": {
     "founder_name": "...",
@@ -314,6 +319,7 @@ RULES
 OUTPUT FORMAT
 You MUST respond with valid JSON containing these keys:
 {
+  "flaws": [{"flag": "description of the red flag regarding RBI/FEMA or business setup", "remediation": "steps to resolve the flaw"}],
   "draft_banner": "DRAFT — PENDING HUMAN REVIEW. NOT LEGAL, TAX, OR CREDIT ADVICE.",
   "unverified_claims": [
     {

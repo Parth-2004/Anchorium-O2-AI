@@ -119,8 +119,9 @@ class GaapTranslatorAgent(BaseAgent):
             answer=data.get("answer", raw_response),
             structured_data=data,
             confidence_tier=overall,
-            requires_ca_review=True,  # GAAP translation always needs CA review
-            model_used=self._config.model_name,
+            requires_ca_review=True,
+            flaws=data.get('flaws', []),  # GAAP translation always needs CA review
+            model_used=self._config.hf_model_name,
             raw_response=raw_response,
         )
 

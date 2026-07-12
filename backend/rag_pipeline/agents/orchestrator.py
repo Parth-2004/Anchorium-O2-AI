@@ -329,6 +329,17 @@ class MasterOrchestrator:
                 sections.append(f"- {reason}")
 
         sections.append(f"\n**Overall Confidence:** {overall_confidence.value}")
+        # Flaws / Red Flags Section
+        all_flaws = []
+        for name, output in agent_outputs.items():
+            if output.flaws:
+                all_flaws.extend(output.flaws)
+
+        if all_flaws:
+            sections.append("\n---\n## Identified Red Flags & Remediation")
+            for flaw in all_flaws:
+                sections.append(f"- **Flag:** {flaw.get('flag')}\n  **Remediation:** {flaw.get('remediation')}")
+
 
         # KYC Section
         if "kyc_extractor" in agent_outputs:

@@ -126,7 +126,8 @@ class KycExtractorAgent(BaseAgent):
             structured_data=data,
             confidence_tier=overall,
             requires_ca_review=overall != ConfidenceTier.HIGH or bool(data.get("flagged_for_human_review")),
+            flaws=data.get('flaws', []),
             cross_border_data_flag=cross_border,
-            model_used=self._config.model_name,
+            model_used=self._config.hf_model_name,
             raw_response=raw_response,
         )
