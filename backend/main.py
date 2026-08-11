@@ -22,6 +22,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import anyio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -215,11 +216,12 @@ async def _stream_agent_response(
 
     try:
         orchestrator = _get_orchestrator()
-        output = orchestrator.run_single_agent(
-            agent_name=agent_name,
-            query=query,
-            context_chunks=context_chunks if context_chunks else None,
-            input_data=input_data,
+        output = await anyio.to_thread.run_sync(
+            orchestrator.run_single_agent,
+            agent_name,
+            query,
+            context_chunks if context_chunks else None,
+            input_data,
         )
 
         # Stream the main answer
@@ -272,9 +274,10 @@ async def _stream_pipeline_response(
 
     try:
         orchestrator = _get_orchestrator()
-        result = orchestrator.run_full_pipeline(
-            query=query,
-            context_chunks=context_chunks if context_chunks else None,
+        result = await anyio.to_thread.run_sync(
+            orchestrator.run_full_pipeline,
+            query,
+            context_chunks if context_chunks else None,
         )
 
         # Stream each agent's output
