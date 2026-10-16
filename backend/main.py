@@ -22,10 +22,13 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +260,8 @@ async def _stream_agent_response(
         yield _sse({"type": "done"})
 
     except Exception as e:
-        error_msg = f"Agent {agent_name} error: {str(e)}"
+        logger.error("agent_execution_failed", agent=agent_name, error=str(e), exc_info=True)
+        error_msg = f"Agent {agent_name} error: An internal error occurred."
         yield _sse({"type": "error", "message": error_msg})
 
 
@@ -302,7 +306,8 @@ async def _stream_pipeline_response(
         yield _sse({"type": "done"})
 
     except Exception as e:
-        error_msg = f"Pipeline error: {str(e)}"
+        logger.error("pipeline_execution_failed", error=str(e), exc_info=True)
+        error_msg = "Pipeline error: An internal error occurred."
         yield _sse({"type": "error", "message": error_msg})
 
 
