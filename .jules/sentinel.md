@@ -1,0 +1,4 @@
+## 2024-10-16 - Prevent Exception Leaks in SSE Streams
+**Vulnerability:** Uncaught exceptions were being serialized and sent directly to the frontend via Server-Sent Events (SSE) in `backend/main.py`. The `except Exception as e:` blocks in stream generators returned `str(e)`.
+**Learning:** SSE endpoints are just as vulnerable to information leakage as standard REST endpoints. Catching exceptions and directly embedding `str(e)` in the `_sse()` yield exposes internal stack traces, library details, or even prompt/API key configurations to the client depending on the underlying failure.
+**Prevention:** Always log the full exception server-side using `structlog` (or `logging`) with `exc_info=True`. Return only generic, non-descriptive error messages (e.g., "An internal error occurred") to the SSE stream. This separates internal debugging from client-facing output.
