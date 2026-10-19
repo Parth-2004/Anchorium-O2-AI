@@ -1,11 +1,12 @@
-import pytest
 from datetime import date, timedelta
 from unittest.mock import patch
 
+import pytest
+
 from rag_pipeline.agents.confidence import (
-    classify_confidence,
-    ConfidenceTier,
     STALE_SOURCE_MONTHS,
+    ConfidenceTier,
+    classify_confidence,
 )
 
 
