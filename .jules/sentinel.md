@@ -1,0 +1,4 @@
+## 2026-10-21 - [Exception Information Leakage in SSE Streams]
+**Vulnerability:** The backend SSE stream endpoints (`_stream_agent_response` and `_stream_pipeline_response`) were catching generic exceptions and directly stringifying the raw error details into the SSE response payload sent to the client (`error_msg = f"Agent {agent_name} error: {str(e)}"`).
+**Learning:** In streaming responses, it's easy to accidentally leak internal server information (like stack traces or backend paths) when attempting to provide helpful error messages to the client. This violates the "Fail securely" principle.
+**Prevention:** Always log raw exception details server-side (e.g., using `print` or a logging library) and return a generic, non-revealing error message to the client, even in streaming (SSE) scenarios.

@@ -210,7 +210,7 @@ class BaseAgent(ABC):
         cleaned = raw_response.strip()
 
         # Extract the outermost JSON object if present, bypassing any leading/trailing text
-        json_match = re.search(r'(\{.*\})', cleaned, re.DOTALL)
+        json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
         if json_match:
             cleaned = json_match.group(1).strip()
         else:
