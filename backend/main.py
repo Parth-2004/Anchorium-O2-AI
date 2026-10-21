@@ -257,8 +257,10 @@ async def _stream_agent_response(
         yield _sse({"type": "done"})
 
     except Exception as e:
-        error_msg = f"Agent {agent_name} error: {str(e)}"
-        yield _sse({"type": "error", "message": error_msg})
+        print(f"⚠️ Internal Server Error in agent '{agent_name}': {e}")
+        yield _sse(
+            {"type": "error", "message": "An internal error occurred during agent processing. Please try again later."}
+        )
 
 
 async def _stream_pipeline_response(
@@ -302,8 +304,13 @@ async def _stream_pipeline_response(
         yield _sse({"type": "done"})
 
     except Exception as e:
-        error_msg = f"Pipeline error: {str(e)}"
-        yield _sse({"type": "error", "message": error_msg})
+        print(f"⚠️ Internal Server Error in pipeline: {e}")
+        yield _sse(
+            {
+                "type": "error",
+                "message": "An internal error occurred during pipeline execution. Please try again later.",
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
