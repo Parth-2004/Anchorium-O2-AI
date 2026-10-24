@@ -22,7 +22,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -94,6 +94,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """
+    Middleware to inject security headers into all responses.
+    CSP is tuned to allow FastAPI's Swagger UI and ReDoc to function.
+    """
+    response = await call_next(request)
+
+    # Content-Security-Policy
+    # Allow inline scripts and jsdelivr to ensure Swagger UI/ReDoc keep working
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+
+    # X-Content-Type-Options
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # X-Frame-Options
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # Strict-Transport-Security (HSTS)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    return response
 
 
 # ---------------------------------------------------------------------------
