@@ -18,6 +18,7 @@ SECURITY NOTE:
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -84,14 +85,17 @@ app = FastAPI(
 # CORS Middleware — Allow the Next.js frontend to communicate
 # ---------------------------------------------------------------------------
 # In production, replace "*" with the exact frontend domain.
+allowed_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")] if allowed_origins_env else [
+    "http://localhost:3000",  # Next.js dev server
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev server
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
