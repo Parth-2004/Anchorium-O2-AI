@@ -108,9 +108,9 @@ async def add_security_headers(request: Request, call_next):
     csp = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
         "img-src 'self' data: https://fastapi.tiangolo.com; "
-        "font-src 'self' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "form-action 'self';"
